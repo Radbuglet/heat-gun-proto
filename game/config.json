@@ -1,0 +1,129 @@
+{
+  "conf": {
+    "game_page_title": "Heat Gun",
+    "min_kill_y": 1000,
+    "player_max_health": 20,
+    "player_size": 35,
+    "title_screen_title": "Heat Gun",
+    "title_screen_instructions": [
+      [{
+          "color": "gold",
+          "text": "==="
+        },
+        {
+          "color": "red",
+          "text": " Instructions "
+        },
+        {
+          "color": "gold",
+          "text": "==="
+        }
+      ],
+      [{
+        "color": "gray",
+        "text": "Kill other players or they will kill you!"
+      }],
+      [],
+      [{
+          "color": "gold",
+          "text": "==="
+        },
+        {
+          "color": "red",
+          "text": " Controls "
+        },
+        {
+          "color": "gold",
+          "text": "==="
+        }
+      ],
+      [{
+          "color": "gold",
+          "text": "click"
+        },
+        {
+          "color": "red",
+          "text": " ⁍ "
+        },
+        {
+          "color": "gray",
+          "text": " Fire weapon"
+        }
+      ],
+      [{
+          "color": "gold",
+          "text": "shift"
+        },
+        {
+          "color": "red",
+          "text": " ⁍ "
+        },
+        {
+          "color": "gray",
+          "text": " Slow player speed"
+        }
+      ],
+      [{
+          "color": "gold",
+          "text": "num 1"
+        },
+        {
+          "color": "red",
+          "text": " ⁍ "
+        },
+        {
+          "color": "gray",
+          "text": " Select 1st weapon"
+        }
+      ],
+      [{
+          "color": "gold",
+          "text": "num 2"
+        },
+        {
+          "color": "red",
+          "text": " ⁍ "
+        },
+        {
+          "color": "gray",
+          "text": " Select 2nd weapon"
+        }
+      ],
+      [],
+      [{
+          "color": "magenta",
+          "text": "May 26 "
+        },
+        {
+          "color": "purple",
+          "text": "A large suprise awaits..."
+        }
+      ]
+    ],
+    "screen_bg": "radial-gradient(#b5b5b5, #eee)",
+    "building_commands_enabled": true
+  },
+  "map_data": {
+    "power_up_boxes": [{
+        "x": 100,
+        "y": -300
+      },
+      {
+        "x": 400,
+        "y": -700
+      },
+      {
+        "x": -400,
+        "y": -1100
+      },
+      {
+        "x": 4410,
+        "y": -548
+      }
+    ]
+  },
+  "whitelist_password": {
+    "enabled": true,
+    "password": "e7qq6"
+  }
+}
