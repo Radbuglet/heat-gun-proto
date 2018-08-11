@@ -11,6 +11,7 @@
       this.death_reason = [];
       this.state = "menu";
       this.power_up_crystal_data = [];
+      this.cloud_horizon = new rebound_helpers.CloudHorizon(this.ctx);
 
       this.player = null;
       this.other_players = {};
@@ -61,6 +62,9 @@
       });
 
       socket.on('heartbeat', data => {
+        const sv_dt = rebound_common.get_net_ts() - data.svr_timestamp;
+        const sv_ticks = sv_dt / ((1 / 60) * 1000);
+
         if (data.power_up_crystal_data instanceof Array) {
             this.power_up_crystal_data = data.power_up_crystal_data;
         }
@@ -85,6 +89,7 @@
 
             player.velocity.setX(player_data.vX);
             player.velocity.setY(player_data.vY);
+
             player.health = player_data.health;
             player.energy = player_data.energy;
             player.weapons = player_data.weapons;
@@ -93,6 +98,7 @@
             player.power_up_slot = player_data.power_up_slot;
             player.current_power_up = player_data.current_power_up;
             player.power_up_time_left = player_data.power_up_time_left;
+            rebound_common.apply_physics(player, sv_ticks);
           }
         });
 
@@ -285,6 +291,9 @@
         return;
       }
 
+      // Background
+      this.cloud_horizon.draw();
+
       // Scene rendering
       this.camera.attach(ctx, w, h);
 
@@ -468,7 +477,7 @@
 
       this.player.weapons.forEach((weapon, index) => {
         ctx.save();
-        ctx.fillStyle = this.selected_weapon_index === index ? "#5488c4" : "#1a1a1a";
+        ctx.fillStyle = this.selected_weapon_index === index ? `hsl(${Date.now() / 20}deg, 75%, 50%)` : `hsl(${Date.now() / 20}deg, 25%, 15%)`;
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 3;
         const weapon_y_coord = weapons_start + (weapon_item_height + weapon_item_in_between) * index;
@@ -572,19 +581,23 @@
         const power_up_type = rebound_common.powerup_types[this.player.power_up_slot || this.player.current_power_up];
         ctx.save();
         ctx.fillStyle = power_up_type.bg_color;
-        ctx.fillRect(w / 2 - 100, 0, 200, 100);
-        ctx.fillStyle = "#fff";
+        ctx.fillRect(w / 2 - 100, 0, 200, 125);
+
+        ctx.fillStyle = `rgba(0, 0, 0, 0.25)`;
+        ctx.fillRect(w / 2 - 100, 100, 200, 25);
+        
+        ctx.strokeStyle = `hsl(${Date.now() / 10}deg, 100%, 90%)`;
+        ctx.lineWidth = Math.sin(Date.now() / 100) + 1.5;
         ctx.font = "20px Bangers";
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
         ctx.fillText(power_up_type.name, w / 2, 0 + 50);
         
         if (this.player.power_up_slot !== null) {
-          ctx.fillText("Press P to use", w / 2, 100 + 25);
-          ctx.strokeText("Press P to use", w / 2, 100 + 25);
+          ctx.strokeText("Press P to use", w / 2, 100 + 14);
         } else {
-          ctx.fillText(this.player.power_up_time_left + "s left", w / 2, 100 + 25);
-          ctx.strokeText(this.player.power_up_time_left + "s left", w / 2, 100 + 25);
+          ctx.fillText(this.player.power_up_time_left + "s left", w / 2, 100 + 14);
+          ctx.strokeText(this.player.power_up_time_left + "s left", w / 2, 100 + 14);
         }
         
         ctx.restore();

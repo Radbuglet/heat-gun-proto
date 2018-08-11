@@ -295,8 +295,7 @@
       this.client_interp_position = new exports.Vector(10, 10);
       this.velocity = new exports.Vector(0, 0);
       this.health = 20;
-      this.energy = 730 + 43;
-      this.heat = 0;
+      this.energy = 10;
       this.can_use_rush = true;
       this.name = name;
       this.lowered_phys = false;
@@ -453,7 +452,7 @@
     faze_bullet: {
       name: "Bullet faze",
       description: "(fazes through anything!)",
-      bg_color: "black",
+      bg_color: "#aaa",
       duration: 10,
       rand_repeat: 1
     },
@@ -494,6 +493,10 @@
   exports.world = {};
 
   exports.conf = {};
+
+  exports.get_net_ts = function() {
+    return Date.now();
+  }
 
   exports.apply_config = function(conf_jsn) {
     exports.conf = conf_jsn.conf;

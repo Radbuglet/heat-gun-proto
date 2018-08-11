@@ -20,7 +20,7 @@
     "y": -100,
     "w": 25,
     "h": 200,
-    "color": "lime",
+    "color": "#24d887",
     "bouncy": true,
     "layer": "obj"
   },
@@ -88,7 +88,7 @@
     "w": 25,
     "h": 300,
     "bouncy": true,
-    "color": "lime",
+    "color": "#24d887",
     "layer": "obj"
   },
   {
@@ -185,7 +185,7 @@
     "y": -100,
     "w": 100,
     "h": 25,
-    "color": "lime",
+    "color": "#24d887",
     "bouncy": true,
     "layer": "obj"
   },
@@ -251,7 +251,7 @@
     "y": -1000,
     "w": 300,
     "h": 25,
-    "color": "lime",
+    "color": "#24d887",
     "bouncy": true,
     "layer": "obj"
   },

@@ -498,7 +498,7 @@ setInterval(_ => {
 
 function broadcast_state(single_user_only, user_added_data, global_added_data) {
   let update_data = {
-    svr_timestamp: Date.now(),
+    svr_timestamp: common.get_net_ts(),
     glob_add: global_added_data,
     player_data: []
   }

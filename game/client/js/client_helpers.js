@@ -32,11 +32,10 @@
     ctx.restore();
 
     ctx.save();
-    ctx.fillStyle = "gold";
+    ctx.fillStyle = `hsl(${Date.now() / 100}deg, 50%, 30%)`;
     ctx.lineWidth = 2;
     ctx.textAlign = "center";
     ctx.font = "15px monospace";
-    ctx.strokeText(player.name, render_position.getX() + rebound_common.conf.player_size / 2, render_position.getY() - 20);
     ctx.fillText(player.name, render_position.getX() + rebound_common.conf.player_size / 2, render_position.getY() - 20);
     ctx.restore();
 
@@ -78,6 +77,70 @@
     ctx.stroke();
     ctx.closePath();
     ctx.restore();
+  }
+
+  exports.CloudHorizon = class {
+    constructor(ctx) {
+      this.ctx = ctx;
+      this.cloud_layers = [
+        new exports.CloudLayer(ctx, 0, 12, "#aaf"),
+        new exports.CloudLayer(ctx, 50, 10, "#eaf"),
+        new exports.CloudLayer(ctx, 100, 6, "#fff"),
+        new exports.CloudLayer(ctx, 200, 2, "#eee")
+      ];
+      this.cloud_layers.reverse();
+    }
+
+    draw() {
+      this.cloud_layers.forEach(layer => {
+        layer.draw();
+      });
+    }
+  }
+
+  exports.CloudLayer = class {
+    constructor(ctx, y_pos, scroll_speed, color) {
+      this.ctx = ctx;
+      this.color = color;
+      this.min_ypos = y_pos;
+      this.scroll_speed = scroll_speed;
+
+      this.seg_spacing = 50;
+      this.scroll_y = 0;
+      this.cloud_seg_heights = new Array(200).fill(0).map(_ => Math.random() * 100);
+    }
+
+    get_seg_xpos(seg_index) {
+      return this.scroll_y + this.seg_spacing * seg_index;
+    }
+
+    draw() {
+      const height = this.ctx.canvas.height;
+      this.ctx.save();
+      this.ctx.fillStyle = this.color;
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.get_seg_xpos(0), height);
+
+      this.cloud_seg_heights.forEach((seg_height, seg_index) => {
+        this.ctx.lineTo(this.get_seg_xpos(seg_index), height - this.min_ypos - seg_height);
+      });
+
+      this.ctx.lineTo(this.get_seg_xpos(this.cloud_seg_heights.length - 1), height);
+      this.ctx.lineTo(this.get_seg_xpos(0), height);
+
+      this.ctx.fill();
+
+      this.scroll_y -= this.scroll_speed;
+
+      if (this.get_seg_xpos(0) < -100) {
+        this.cloud_seg_heights.shift();
+        this.cloud_seg_heights.push(Math.random() * 100);
+        this.scroll_y += this.seg_spacing;
+      }
+
+      this.ctx.restore();
+    }
   }
 
   exports.Camera = class {
@@ -210,7 +273,7 @@
               ctx.stroke();
               ctx.fill();
             } else {
-              ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+              ctx.fillRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
             }
             
             draw_one_way_arrow();
@@ -541,7 +604,9 @@
 
         lt(face.p2.getX(), face.p2.getY());
         ctx.fillStyle = "#3a3a3a";
+        ctx.strokeStyle = "#3a3a3a";
         ctx.fill();
+        ctx.stroke();
         ctx.restore();
       });
     }
