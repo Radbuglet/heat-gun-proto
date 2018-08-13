@@ -6,6 +6,7 @@
     init() {
       console.log("This project is open sourced. If you want to see the source code, head over to https://github.com/Radbuglet/heat-gun-proto");
 
+      this.last_ping = -719;
       this.gun_dir = new rebound_common.Vector(0, 1);
       this.gun_anim_back = 0;
       this.death_reason = [];
@@ -66,6 +67,7 @@
         const sv_dt = rebound_common.get_net_ts() - data.svr_timestamp;
         const sv_ticks = sv_dt / ((1 / 60) * 1000);
 
+        this.last_ping = sv_dt;
         if (data.power_up_crystal_data instanceof Array) {
             this.power_up_crystal_data = data.power_up_crystal_data;
         }

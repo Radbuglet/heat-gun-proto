@@ -267,10 +267,9 @@
         player.velocity.setX(-player.velocity.getX());
         break;
       }
-      if (x % 3 === 0) {
-        let a = player.velocity.getX() > 0 ? -0.4 : 0.4;
-        player.velocity.setX(player.velocity.getX() + a);
-      }
+
+      let a = Math.min(Math.abs(player.velocity.getX()), 0.4 / 3) * -Math.sign(player.velocity.getX());
+      player.velocity.setX(player.velocity.getX() + a);
     }
 
     for (let x = 0; x < Math.abs(vel_with_delta.getY()); x++) {
