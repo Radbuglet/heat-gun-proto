@@ -189,7 +189,7 @@ socket.on('connection', client => {
             let ouser = players[sock_uuid];
             if (ouser !== null && ouser.isPlaying() && ouser.pub_uuid !== user.pub_uuid) {
               if (common.testrectcollision(
-                  ray.pos.getX() - ray.get_size_vec().x / 2, ray.pos.getY() - ray.get_size_vec().y / 2, ray.get_size_vec().x, ray.get_size_vec().y,
+                  ray.pos.getX() - ray.get_size_vec().getX() / 2, ray.pos.getY() - ray.get_size_vec().getY() / 2, ray.get_size_vec().getX(), ray.get_size_vec().getY(),
                   ouser.player.position.getX(), ouser.player.position.getY(),
                   common.conf.player_size, common.conf.player_size
                 )) {
