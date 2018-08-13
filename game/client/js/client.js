@@ -4,7 +4,7 @@
   class Game extends rebound_helpers.CanvasApplication {
     // Application code
     init() {
-      console.log("This project is open sourced. If you want to see the source code, head over to https://www.github.com/radbuglet/rebound_game");
+      console.log("This project is open sourced. If you want to see the source code, head over to https://github.com/Radbuglet/heat-gun-proto");
 
       this.gun_dir = new rebound_common.Vector(0, 1);
       this.gun_anim_back = 0;
