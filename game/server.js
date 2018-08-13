@@ -169,6 +169,10 @@ socket.on('connection', client => {
         user.player.velocity = vec.mult(
           new common.Vector(is_grounded ? 40 : 30, is_grounded ? 40 : 30).add(new common.Vector(weapon.conf.additional_launching_power * 3, weapon.conf.additional_launching_power * 3))
         ).negate();
+
+        if (weapon.conf.suck_mode) {
+          user.player.velocity = user.player.velocity.negate();
+        }
   
   
         let ray = new common.Ray();

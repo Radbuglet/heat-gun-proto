@@ -311,6 +311,7 @@
             additional_size: 0,
             additional_launching_power: 0,
             additional_efficiency: 0,
+            suck_mode: 0,
             bullet_gravity: 0
           }
         },
@@ -322,7 +323,8 @@
             additional_size: 0,
             additional_callibur: 0,
             additional_launching_power: 0,
-            bullet_gravity: 0
+            bullet_gravity: 0,
+            suck_mode: 0,
           }
         }
       ]
@@ -364,6 +366,12 @@
       name: "Bullet Gravity",
       maxval: 4,
       cost: 3
+    },
+    {
+      key: "suck_mode",
+      name: "Suck Mode",
+      maxval: 1,
+      cost: 10
     }
   ]
 
