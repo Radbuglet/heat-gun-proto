@@ -68,6 +68,7 @@
         const sv_ticks = sv_dt / ((1 / 60) * 1000);
 
         this.last_ping = sv_dt;
+
         if (data.power_up_crystal_data instanceof Array) {
             this.power_up_crystal_data = data.power_up_crystal_data;
         }
@@ -433,7 +434,7 @@
       
 
       ctx.save();
-      ctx.fillStyle = "#3f3f3f";
+      ctx.fillStyle = "#3f3d3fdd";
       ctx.fillRect(ammo_px, ammo_py, 100, 50);
 
       ctx.fillStyle = "#fff";
@@ -483,7 +484,7 @@
 
       this.player.weapons.forEach((weapon, index) => {
         ctx.save();
-        ctx.fillStyle = this.selected_weapon_index === index ? `hsl(${Date.now() / 20}deg, 75%, 50%)` : `hsl(${Date.now() / 20}deg, 25%, 15%)`;
+        ctx.fillStyle = this.selected_weapon_index === index ? `hsl(${Date.now() / 20}deg, 30%, 50%)` : `#3f3d3fdd`;
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 3;
         const weapon_y_coord = weapons_start + (weapon_item_height + weapon_item_in_between) * index;
@@ -516,7 +517,7 @@
         if (Math.abs(index - this.selected_trait_edit_index) > 1) return;
         const vis_index = index - this.selected_trait_edit_index;
         ctx.save();
-        ctx.fillStyle = this.selected_trait_edit_index === index ? "#4a0a0a" : "#1a1a1aaa";
+        ctx.fillStyle = this.selected_trait_edit_index === index ? `hsl(${Date.now() / 20}deg, 10%, 30%)` : "#3f3d3fdd";
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 3;
         const y_coord = weapons_traitconf_start + (weapon_traitconf_item_height + weapon_traitconf_item_in_between) * vis_index;
@@ -526,10 +527,10 @@
         
         if (index == 0 || index == rebound_common.weapon_configurables.length - 1) {
 
-          ctx.fillStyle = "#8e7f33";
+          ctx.fillStyle = "#171717";
           ctx.fillRect(weapon_traitconf_x_pos, ((index == 0) ? (y_coord - 75) : (y_coord + 50 + weapon_traitconf_item_height)) + 5, weapon_traitconf_item_width, 25);
 
-          ctx.fillStyle = "#aaa46f";
+          ctx.fillStyle = "#232323";
           ctx.fillRect(weapon_traitconf_x_pos, ((index == 0) ? (y_coord - 75) : (y_coord + 50 + weapon_traitconf_item_height)), weapon_traitconf_item_width, 25);
         }
 
@@ -551,14 +552,14 @@
             text: "ERR"
           }).map((_, i) => {
             return i < this.player.weapons[this.selected_weapon_index].conf[configurable.key] ? {
-              color: "yellow",
+              color: highlight_color,
               text: "▉"
             } : {
               color: "gray",
               text: "▉"
             }
           }).concat([{
-            color: "#CCFFCC",
+            color: highlight_color,
             text: " " + this.player.weapons[this.selected_weapon_index].conf[configurable.key] + " / " + configurable.maxval
           }])
         ], weapon_traitconf_x_pos + 20, y_coord + 20, "monospace 15px", 20, true);
@@ -592,7 +593,7 @@
         ctx.fillStyle = `rgba(0, 0, 0, 0.25)`;
         ctx.fillRect(w / 2 - 100, 100, 200, 25);
         
-        ctx.strokeStyle = `hsl(${Date.now() / 10}deg, 100%, 90%)`;
+        ctx.strokeStyle = `hsl(${Date.now() / 20}deg, 100%, 90%)`;
         ctx.lineWidth = Math.sin(Date.now() / 100) + 1.5;
         ctx.font = "20px Bangers";
         ctx.textBaseline = "middle";

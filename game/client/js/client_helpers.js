@@ -32,7 +32,7 @@
     ctx.restore();
 
     ctx.save();
-    ctx.fillStyle = `hsl(${Date.now() / 100}deg, 50%, 30%)`;
+    ctx.fillStyle = `hsl(${Date.now() / 20}deg, 100%, 30%)`;
     ctx.lineWidth = 2;
     ctx.textAlign = "center";
     ctx.font = "15px monospace";
@@ -433,7 +433,7 @@
       const sp = line_pos.add(out_direction.mult(new rebound_common.Vector(Math.random() * rheight, Math.random() * rheight)));
       ctx.lineTo(sp.getX(), sp.getY());
 
-      ctx.strokeStyle = `hsl(${Date.now() / 10}deg, ${((-min_axis_dist + 1000) / 1000) * 100}%, ${((-min_player_dist + 5000) / 5000) * 75}%)`;
+      ctx.strokeStyle = `hsl(${Date.now() / 20}deg, ${Math.min(((-min_axis_dist + 1000) / 1000), 0.25) * 100}%, ${Math.min(((-min_player_dist + 5000) / 5000), 0.25) * 75}%)`;
       ctx.stroke();
 
       last_line_pos.setX(sp.getX());
