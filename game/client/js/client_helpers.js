@@ -172,12 +172,11 @@
     }
   }
 
-  exports.draw_world = function(ctx, w, h, cam, custom_block_code, cs_world, draw_3d) {
+  exports.get_culled = function(cam, w, h, world) {
     const min = cam.toWorldPos(new rebound_common.Vector(0, 0), w, h);
     const max = cam.toWorldPos(new rebound_common.Vector(w, h), w, h);
-    const center = cam.toWorldPos(new rebound_common.Vector(w / 2, h / 2), w, h);
 
-    const culled_objects = (cs_world || rebound_common.world).tiles.map((obj, i) => {return {obj, i}}).filter(obj => {
+    return world.tiles.map((obj, i) => {return {obj, i}}).filter(obj => {
       obj = obj.obj;
       const bound = 350;
       if (obj.x + obj.w + bound < min.getX() || obj.x - bound > max.getX() || obj.y + obj.h + bound < min.getY() || obj.y - bound > max.getY()) {
@@ -185,6 +184,12 @@
       }
       return true;
     });
+  }
+
+  exports.draw_world = function(ctx, w, h, cam, custom_block_code, cs_world, draw_3d) {
+    const center = cam.toWorldPos(new rebound_common.Vector(w / 2, h / 2), w, h);
+
+    const culled_objects = exports.get_culled(cam, w, h, cs_world || rebound_common.world);
     const renderer_3d = new exports.PointPerspective3DRenderer();
 
     if (draw_3d) {
