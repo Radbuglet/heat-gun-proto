@@ -67,6 +67,8 @@
         const sv_dt = rebound_common.get_net_ts() - data.svr_timestamp;
         const sv_ticks = sv_dt / ((1 / 60) * 1000);
 
+        this.my_pub_uuid = data.my_pub_uuid
+
         this.last_ping = sv_dt;
 
         if (data.power_up_crystal_data instanceof Array) {
@@ -485,7 +487,25 @@
       }
 
       const char_disp = 13 * 2 + 1;
-      const player_placing = "@TODO";
+      const leaderboard = Object.values(this.other_players).concat([this.player]).sort(function(a, b) {
+        return b.energy - a.energy;
+      });
+
+      let player_placing = "@TODO";
+      const leaderboard_text = leaderboard.map((player, i) => {
+        if (player == this.player) {
+          player_placing = i + 1;
+        }
+        if (i > 9) {
+          return;
+        }
+        return [
+          { color: "#3f3d3fdd", text: " " + (i + 1) + " ", bg: highlight_color },
+          { color: "#FF5555", text: " " + player.name.substring(0, 15) + " ", bg: "#3f3d3fdd" },
+          { color: "#fff", text: new Array(char_disp - player.name.substring(0, 15).length - 5).fill(" ").join("")},
+          { color: "#3f3d3fdd", text: " " + Math.round(player.energy) + " ", bg: highlight_color },
+        ]
+      });
       const players_online = Object.keys(this.other_players).length + 1;
       const your_place_text_length = (" YOU  " + player_placing + " ").length - 1;
       rebound_helpers.draw_text_colored(ctx, [
@@ -500,8 +520,11 @@
           { color: "#fff", text: new Array(Math.max(char_disp - 18 - your_place_text_length, 1)).fill(" ").join("") },
           { color: "#FF5555", text: " YOU ", bg: "#3f3d3fdd" },
           { color: "#3f3d3fdd", text: " " + player_placing + " ", bg: highlight_color },
-        ]
-      ], 10, 0, "15px monospace", 17, true);
+        ],
+        []
+      ].concat(
+        leaderboard_text
+      ), 10, 0, "15px monospace", 17, true);
       
       ctx.restore();
 
