@@ -172,7 +172,7 @@
     }
   }
 
-  exports.draw_world = function(ctx, w, h, cam, custom_block_code, cs_world) {
+  exports.draw_world = function(ctx, w, h, cam, custom_block_code, cs_world, draw_3d) {
     const min = cam.toWorldPos(new rebound_common.Vector(0, 0), w, h);
     const max = cam.toWorldPos(new rebound_common.Vector(w, h), w, h);
     const center = cam.toWorldPos(new rebound_common.Vector(w / 2, h / 2), w, h);
@@ -186,29 +186,32 @@
       return true;
     });
     const renderer_3d = new exports.PointPerspective3DRenderer();
-    culled_objects.forEach(obj => {
-      obj = obj.obj;
-      if (obj.layer === "obj" || obj.layer === "dec") {
-        const depth = obj.layer === "dec" ? 0.015 : 0.25;
-        renderer_3d.addFace("red",
-          obj.x, obj.y,
-          obj.x + obj.w, obj.y,
-          depth);
-        renderer_3d.addFace("green",
-          obj.x, obj.y + obj.h,
-          obj.x + obj.w, obj.y + obj.h,
-          depth);
 
-        renderer_3d.addFace("blue",
-          obj.x, obj.y,
-          obj.x, obj.y + obj.h,
-          depth);
-        renderer_3d.addFace("gold",
-          obj.x + obj.w, obj.y,
-          obj.x + obj.w, obj.y + obj.h,
-          depth);
-      }
-    });
+    if (draw_3d) {
+      culled_objects.forEach(obj => {
+        obj = obj.obj;
+        if (obj.layer === "obj" || obj.layer === "dec") {
+          const depth = obj.layer === "dec" ? 0.015 : 0.25;
+          renderer_3d.addFace("red",
+            obj.x, obj.y,
+            obj.x + obj.w, obj.y,
+            depth);
+          renderer_3d.addFace("green",
+            obj.x, obj.y + obj.h,
+            obj.x + obj.w, obj.y + obj.h,
+            depth);
+  
+          renderer_3d.addFace("blue",
+            obj.x, obj.y,
+            obj.x, obj.y + obj.h,
+            depth);
+          renderer_3d.addFace("gold",
+            obj.x + obj.w, obj.y,
+            obj.x + obj.w, obj.y + obj.h,
+            depth);
+        }
+      }); 
+    }
 
     const renderLayer = (layer_name) => {
       const obj_faces = [];
@@ -229,7 +232,7 @@
             const cy = obj.y + obj.h / 2;
             
             ctx.save();
-            ctx.translate(cx, cy);
+            ctx.translate(Math.floor(cx), Math.floor(cy));
             ctx.scale(0.5, 0.5);
             ctx.setLineDash([5, 5]);
             
@@ -603,8 +606,8 @@
         lt(point_2.getX(), point_2.getY());
 
         lt(face.p2.getX(), face.p2.getY());
-        ctx.fillStyle = "#3a3a3a";
-        ctx.strokeStyle = "#3a3a3a";
+        ctx.fillStyle = "#352f2c";
+        ctx.strokeStyle = ctx.fillStyle;
         ctx.fill();
         ctx.stroke();
         ctx.restore();
