@@ -404,7 +404,7 @@
 
     ctx.lineWidth = 5;
 
-    const line_pos = start.clone();
+    const line_pos = start.sub(out_direction.mult(new rebound_common.Vector(40, 40)));
     let last_line_pos = start.clone();
 
     for (let x = 0; x < times; x += 1) {
