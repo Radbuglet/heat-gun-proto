@@ -189,7 +189,7 @@ socket.on('connection', client => {
                   ouser.player.position.getX(), ouser.player.position.getY(),
                   common.conf.player_size, common.conf.player_size
                 )) {
-                let damage = Math.max(5 + (weapon.conf.additional_callibur * 1.25) - (weapon.conf.additional_barrels * 0.75), 2);
+                let damage = Math.max(5 + (weapon.conf.additional_callibur * 1.25) - (weapon.conf.additional_barrels * 0.25), 3);
                 if (ouser.player.health - damage <= 0) {
                   broadcast_message([{
                       color: "darkred",
@@ -420,7 +420,7 @@ setInterval(_ => {
             user.last_fuel_ammo_time = Date.now();
           }
 
-          if (weapon.ammo < weapon.conf.additional_ground_ammo + 2 && user.last_fuel_ammo_time + 500 < Date.now()) {
+          if (weapon.ammo < weapon.conf.additional_ground_ammo + 2 && user.last_fuel_ammo_time + 255 < Date.now()) {
             weapon.ammo++;
             changed = true;
             user.last_fuel_ammo_time = Date.now();
