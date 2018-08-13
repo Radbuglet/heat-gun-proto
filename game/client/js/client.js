@@ -451,14 +451,6 @@
 
 
       ctx.save();
-      ctx.fillStyle = "#3f51b5";
-      ctx.font = "15px monospace";
-      ctx.textAlign = "start";
-      ctx.textBaseline = "top";
-      ctx.fillText("Unspent energy: " + Math.round(this.player.energy), 10, 40);
-      ctx.restore();
-
-      ctx.save();
       rebound_helpers.draw_text_colored(ctx, this.chat_messages, 10, h - 100 - (this.chat_messages.length * 17), "15px monospace", 17, true);
       ctx.restore();
 
@@ -467,7 +459,50 @@
       ctx.font = "15px monospace";
       ctx.textAlign = "right";
       ctx.textBaseline = "top";
-      ctx.fillText("FPS: " + this.fps, w, 0);
+
+      const highlight_color = `hsl(${Date.now() / 20}deg, 100%, 75%)`;
+
+      function generate_ctext_indicator(name, value, additional_bspaces) {
+        const expected_length = 13;
+        const text_length = (" " + name + ": " + new Array(additional_bspaces || 0).fill(" ").join("") + value + " ").length - 1;
+
+        return [
+          {
+            "color": "#FF5555",
+            "bg": "#3f3d3fdd",
+            "text": " " + name + ": " + new Array(additional_bspaces || 0).fill(" ").join("")
+          },
+          {
+            "color": highlight_color,
+            "bg": "#3f3d3fdd",
+            "text": value + " "
+          },
+          {
+            "color": "#fff",
+            "text": new Array(Math.max(expected_length - text_length, 1)).fill(" ").join("")
+          }
+        ]
+      }
+
+      const char_disp = 13 * 2 + 1;
+      const player_placing = "@TODO";
+      const players_online = Object.keys(this.other_players).length + 1;
+      const your_place_text_length = (" YOU  " + player_placing + " ").length - 1;
+      rebound_helpers.draw_text_colored(ctx, [
+        generate_ctext_indicator("FPS", this.fps).concat(generate_ctext_indicator("PING", this.last_ping, 2)),
+        generate_ctext_indicator("OBJ", rebound_helpers.get_culled(this.camera, w, h, rebound_common.world).length).concat(generate_ctext_indicator("ONLINE", Array(3 - players_online.toString().length).fill("0").join("") + players_online)),
+        [],
+        generate_ctext_indicator("PTS", "@TODO").concat(generate_ctext_indicator("ENERGY", Math.round(this.player.energy))),
+        [],
+        [
+          { color: "#3f3d3fdd", text: " >>> ", bg: highlight_color },
+          { color: "#FF5555", text: " LEADERBOARD ", bg: "#3f3d3fdd" },
+          { color: "#fff", text: new Array(Math.max(char_disp - 18 - your_place_text_length, 1)).fill(" ").join("") },
+          { color: "#FF5555", text: " YOU ", bg: "#3f3d3fdd" },
+          { color: "#3f3d3fdd", text: " " + player_placing + " ", bg: highlight_color },
+        ]
+      ], 10, 0, "15px monospace", 17, true);
+      
       ctx.restore();
 
       ctx.save();
