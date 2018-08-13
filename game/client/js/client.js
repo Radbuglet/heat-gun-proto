@@ -12,6 +12,7 @@
       this.state = "menu";
       this.power_up_crystal_data = [];
       this.cloud_horizon = new rebound_helpers.CloudHorizon(this.ctx);
+      this.draw_3d = window.localStorage.opt_use_3d == "1" || window.localStorage.opt_use_3d == null;
 
       this.player = null;
       this.other_players = {};
@@ -156,6 +157,7 @@
     app_keydown(e) {
       let rush_pkt_dir = null;
 
+      if (e.metaKey) return;
       let nums = [
         "1", "2", "3", "4", "5", "6", "7", "8", "9"
       ].forEach((key_id, index) => {
@@ -167,11 +169,16 @@
       });
 
       if (this.player !== null) {
-        if (e.keyCode === 32) {
+        if (e.code === "KeyR" && !e.shiftKey) {
+          this.draw_3d = !this.draw_3d;
+          window.localStorage.opt_use_3d = this.draw_3d ? "1" : "0";
+        }
+
+        if (e.code === "Space") {
           socket.emit('set_lowered_phys', true);
         }
         
-        if (this.player.power_up_slot !== null && e.keyCode === 80) {
+        if (this.player.power_up_slot !== null && e.code === "KeyP") {
           socket.emit('use_power_up');
         }
         
@@ -298,8 +305,10 @@
       this.camera.attach(ctx, w, h);
 
       // Render world
-      rebound_helpers.draw_world(ctx, w, h, this.camera);
+      rebound_helpers.draw_world(ctx, w, h, this.camera, undefined, undefined, this.draw_3d);
+
       rebound_helpers.draw_crystals(ctx, this.power_up_crystal_data, this.total_frames);
+
       rebound_helpers.draw_player(ctx, this.player);
 
       for (let player_pub_uuid in this.other_players) {
@@ -312,11 +321,6 @@
           )
           .mult(new rebound_common.Vector(30, 30)), is_on_ground);*/
       }
-      ctx.save();
-      ctx.fillStyle = "rgba(255, 87, 34, 0.52)";
-      ctx.font = "30px monsopace";
-
-      ctx.restore();
 
       let del_list = []
       let temp_beams = [];
