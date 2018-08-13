@@ -193,7 +193,7 @@ socket.on('connection', client => {
                   ouser.player.position.getX(), ouser.player.position.getY(),
                   common.conf.player_size, common.conf.player_size
                 )) {
-                let damage = Math.max(5 + (weapon.conf.additional_callibur * 1.25) - (weapon.conf.additional_barrels * 0.25), 3);
+                let damage = Math.max(2 + (weapon.conf.additional_callibur * 1.25) - (weapon.conf.additional_barrels * 0.25), 3);
                 if (ouser.player.health - damage <= 0) {
                   broadcast_message([{
                       color: "darkred",
