@@ -464,6 +464,11 @@
         ctx.save();
         ctx.textAlign = "left";
         ctx.font = font_style;
+
+        if (typeof component.bg == "string") {
+          ctx.fillStyle = component.bg;
+          ctx.fillRect(cx, cy, ctx.measureText(component.text).width, calculated_line_height);
+        }
         ctx.fillStyle = component.color;
         ctx.strokeStyle = component.color;
 
