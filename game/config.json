@@ -89,6 +89,46 @@
           "text": " Select 2nd weapon"
         }
       ],
+      [{
+        "color": "gold",
+        "text": "WASD "
+      },
+      {
+        "color": "red",
+        "text": " ⁍ "
+      },
+      {
+        "color": "gray",
+        "text": " Dash (Also works in the air)"
+      }],
+      [{
+        "color": "gold",
+        "text": "arrow"
+      },
+      {
+        "color": "red",
+        "text": " ⁍ "
+      },
+      {
+        "color": "gray",
+        "text": " Select weapon trait (up down)"
+      }],
+      [{
+        "color": "gray",
+        "text": "         Upgrade / Downgrade (left right)"
+      }],
+      [{
+        "color": "gold",
+        "text": "r key"
+      },
+      {
+        "color": "red",
+        "text": " ⁍ "
+      },
+      {
+        "color": "gray",
+        "text": " Toggle render mode"
+      }],
       [],
       [{
           "color": "magenta",
