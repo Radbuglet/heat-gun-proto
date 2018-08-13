@@ -392,8 +392,8 @@
       this.camera.dettach(ctx);
 
       // UI rendering
-
-
+      rebound_helpers.draw_player_localizer(ctx, this, new rebound_common.Vector(0, 0), new rebound_common.Vector(0, 30), new rebound_common.Vector(1, 0), h / 30, true);
+      rebound_helpers.draw_player_localizer(ctx, this, new rebound_common.Vector(w, 0), new rebound_common.Vector(0, 30), new rebound_common.Vector(-1, 0), h / 30, false);
 
       
       ctx.save();

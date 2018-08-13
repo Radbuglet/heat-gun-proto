@@ -394,6 +394,55 @@
     ctx.restore();
   }
 
+  exports.draw_player_localizer = function(ctx, client, start, forward_direction, out_direction, times, look_lt) {
+    ctx.save();
+
+    ctx.lineWidth = 5;
+
+    const line_pos = start.clone();
+    let last_line_pos = start.clone();
+
+    for (let x = 0; x < times; x += 1) {
+      ctx.beginPath();
+      ctx.moveTo(last_line_pos.getX(), last_line_pos.getY());
+
+      line_pos.mutadd(forward_direction);
+
+      let rheight = (client.player.lowered_phys) ? 10 : -50;
+
+      let min_axis_dist = 1000000;
+      let min_player_dist = 100000;
+
+      for (const other_player_uuid in client.other_players) {
+        const other_player = client.other_players[other_player_uuid];
+
+        if ((other_player.position.getX() < client.player.position.getX() && look_lt) || (
+          other_player.position.getX() > client.player.position.getX() && !look_lt
+        )) {
+          const player_dist = Math.abs(other_player.position.getX() - client.player.position.getX());
+          const axis_dist = Math.abs(other_player.position.getY() - client.camera.toWorldPos(line_pos, client.canvas.width, client.canvas.height).getY());
+          rheight += Math.max(
+            (-Math.pow(axis_dist / 100, 2) + 40) + (-Math.pow(player_dist / 400, 2) + 50),
+          0);
+
+          if (axis_dist < min_axis_dist) min_axis_dist = axis_dist;
+          if (player_dist < min_player_dist) min_player_dist = player_dist; 
+        }
+      }
+
+      const sp = line_pos.add(out_direction.mult(new rebound_common.Vector(Math.random() * rheight, Math.random() * rheight)));
+      ctx.lineTo(sp.getX(), sp.getY());
+
+      ctx.strokeStyle = `hsl(${Date.now() / 10}deg, ${((-min_axis_dist + 1000) / 1000) * 100}%, ${((-min_player_dist + 5000) / 5000) * 75}%)`;
+      ctx.stroke();
+
+      last_line_pos.setX(sp.getX());
+      last_line_pos.setY(sp.getY());
+    }
+
+    ctx.restore();
+  }
+
   exports.draw_text_colored = function(ctx, text, x, y, font_style, calculated_line_height, no_center) {
     let cy = y;
     text.forEach(line => {
