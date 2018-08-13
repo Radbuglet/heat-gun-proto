@@ -459,7 +459,12 @@ setInterval(_ => {
         user.player.weapons.forEach(function(weapon) {
           weapon.ammo = 2;
         });
-        user.damage_player(2);
+        user.damage_player(2, [
+          {
+            "color": "red",
+            "text": "You died by void damage"
+          }
+        ]);
         broadcast_state();
       }
     }
