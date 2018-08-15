@@ -3,7 +3,7 @@
     "game_page_title": "Heat Gun",
     "min_kill_y": 1000,
     "player_max_health": 20,
-    "player_size": 35,
+    "player_size": 40,
     "title_screen_title": "Heat Gun",
     "title_screen_instructions": [
       [{
