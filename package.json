@@ -5,6 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "nodemon game/server.js",
+    "forever-start": "forever start game/server.js",
+    "forever-stop": "forever stop game/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
