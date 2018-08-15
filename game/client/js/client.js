@@ -492,7 +492,7 @@
         return b.total_energy - a.total_energy;
       });
 
-      let player_placing = "@TODO";
+      let player_placing = "...";
       const leaderboard_text = leaderboard.map((player, i) => {
         if (player == this.player) {
           player_placing = i + 1;
