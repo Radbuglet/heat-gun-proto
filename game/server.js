@@ -209,6 +209,7 @@ socket.on('connection', client => {
                 let gained_energy = damage / 5;
   
                 user.player.energy += gained_energy;
+                user.player.total_energy += gained_energy;
                 user.sendMessage([{
                     color: "darkgreen",
                     text: "You gained "
@@ -525,6 +526,7 @@ function broadcast_state(single_user_only, user_added_data, global_added_data) {
         weapons: user.player.weapons,
         health: user.player.health,
         energy: user.player.energy,
+        total_energy: user.player.total_energy,
         lowered_phys: user.player.lowered_phys,
         death_reason: user.player.death_reason,
         power_up_slot: user.player.power_up_slot,

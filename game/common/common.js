@@ -295,6 +295,7 @@
       this.velocity = new exports.Vector(0, 0);
       this.health = 20;
       this.energy = 10;
+      this.total_energy = 10;
       this.can_use_rush = true;
       this.name = name;
       this.lowered_phys = false;

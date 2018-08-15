@@ -98,6 +98,7 @@
 
             player.health = player_data.health;
             player.energy = player_data.energy;
+            player.total_energy = player_data.total_energy;
             player.weapons = player_data.weapons;
             player.lowered_phys = player_data.lowered_phys;
             player.death_reason = player_data.death_reason;
@@ -488,7 +489,7 @@
 
       const char_disp = 13 * 2 + 1;
       const leaderboard = Object.values(this.other_players).concat([this.player]).sort(function(a, b) {
-        return b.energy - a.energy;
+        return b.total_energy - a.total_energy;
       });
 
       let player_placing = "@TODO";
@@ -503,7 +504,7 @@
           { color: "#3f3d3fdd", text: " " + (i + 1) + " ", bg: highlight_color },
           { color: "#FF5555", text: " " + player.name.substring(0, 15) + " ", bg: "#3f3d3fdd" },
           { color: "#fff", text: new Array(char_disp - player.name.substring(0, 15).length - 5).fill(" ").join("")},
-          { color: "#3f3d3fdd", text: " " + Math.round(player.energy) + " ", bg: highlight_color },
+          { color: "#3f3d3fdd", text: " " + Math.round(player.total_energy) + " ", bg: highlight_color },
         ]
       });
       const players_online = Object.keys(this.other_players).length + 1;
@@ -512,7 +513,7 @@
         generate_ctext_indicator("FPS", this.fps).concat(generate_ctext_indicator("PING", this.last_ping, 2)),
         generate_ctext_indicator("OBJ", rebound_helpers.get_culled(this.camera, w, h, rebound_common.world).length).concat(generate_ctext_indicator("ONLINE", Array(3 - players_online.toString().length).fill("0").join("") + players_online)),
         [],
-        generate_ctext_indicator("PTS", "@TODO").concat(generate_ctext_indicator("ENERGY", Math.round(this.player.energy))),
+        generate_ctext_indicator("PTS", Math.round(this.player.total_energy)).concat(generate_ctext_indicator("ENERGY", Math.round(this.player.energy))),
         [],
         [
           { color: "#3f3d3fdd", text: " >>> ", bg: highlight_color },
