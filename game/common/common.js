@@ -127,6 +127,10 @@
 
       return Math.sqrt(a * a + b * b);
     }
+    
+    getdeg() {
+      return exports.todeg(Math.atan2(this.getX(), this.getY()));
+    }
   }
 
   exports.testrectcollision = function(x1, y1, w1, h1, x2, y2, w2, h2) {
@@ -247,7 +251,7 @@
   }
 
   exports.apply_physics = function(player, ticks) {
-    let c = (player.lowered_phys ? 0.2 : 0.9);
+    let c = (player.lowered_phys ? 0.2 : 0.8);
     ticks = ticks * c;
     const vel_with_delta = player.velocity.mult(new exports.Vector(ticks, ticks));
 
@@ -293,6 +297,7 @@
       this.position = new exports.Vector(10, 10);
       this.client_interp_position = new exports.Vector(10, 10);
       this.velocity = new exports.Vector(0, 0);
+      this.action_ack_id = null;
       this.health = 20;
       this.energy = 10;
       this.total_energy = 10;
@@ -408,8 +413,8 @@
       return "Please fill in this field.";
     }
 
-    if (username.length > 50) {
-      return "Screw you Senya";
+    if (username.length > 25) {
+      return "That name is too long";
     }
 
     return null;
@@ -417,6 +422,10 @@
 
   exports.torad = function(deg) {
     return deg / (Math.PI / 180);
+  }
+  
+  exports.todeg = function(rad) {
+    return rad * 180 / Math.PI;
   }
 
   exports.rush_packet_enum_dirs = {
@@ -476,7 +485,7 @@
   exports.hslToRgb = function(h, s, l) {
     var r, g, b;
 
-    if(s == 0){
+    if(s === 0){
         r = g = b = l; // achromatic
     }else{
         var hue2rgb = function hue2rgb(p, q, t){
@@ -497,13 +506,25 @@
 
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
+  
+  exports.apply_gun_forces = function(player, gun_dir_vec, weapon) {
+    const is_grounded = exports.is_on_ground(player.position);
+    
+    player.velocity = gun_dir_vec.mult(
+          new exports.Vector(is_grounded ? 40 : 30, is_grounded ? 40 : 30).add(new exports.Vector(weapon.conf.additional_launching_power * 3, weapon.conf.additional_launching_power * 3))
+        ).negate();
+
+        if (weapon.conf.suck_mode) {
+          player.velocity.mutnegate();
+        }
+  }
 
   exports.world = {};
 
   exports.conf = {};
 
   exports.get_net_ts = function() {
-    return Date.now();
+    return new Date().getTime();
   }
 
   exports.apply_config = function(conf_jsn) {

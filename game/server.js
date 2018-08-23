@@ -11,13 +11,22 @@ const common = require('./common/common');
 const app = express();
 
 const conf_path = path.join(__dirname, "config.json");
+const leaderboard_path = path.join(__dirname, "leaderboard.json");
 let config_data;
+let leaderboard_data;
 
 if (fs.existsSync(conf_path) && fs.statSync(conf_path).isFile()) {
   config_data = JSON.parse(
     fs.readFileSync(conf_path, "utf-8"));
 } else {
   throw "Missile config.json in the same directory as server.js";
+}
+
+if (fs.existsSync(leaderboard_path) && fs.statSync(leaderboard_path).isFile()) {
+  leaderboard_data = JSON.parse(
+    fs.readFileSync(leaderboard_path, "utf-8"));
+} else {
+  throw "Missile leaderboard.json in the same directory as server.js";
 }
 
 config_data.map_data.tiles = JSON.parse(fs.readFileSync(path.join(__dirname, "map_tiles.json"), "utf-8"));
@@ -34,6 +43,10 @@ app.get('/editor', function(req, res) {
 
 app.get('/config', function(req, res) {
   res.type("text/javascript").send("window.rebound_config = " + JSON.stringify(config_data));
+});
+
+app.get('/leaderboard', function(req, res) {
+  res.send(leaderboard_data);
 });
 
 app.use('/common', express.static(path.join(__dirname, "common")));
@@ -71,6 +84,30 @@ class SocketUserController {
   }
 
   dead() {
+    leaderboard_data.forEach(category => {
+      if (category.scores.length >= category.max_entries) {
+        if (this.player.total_energy <= category.scores[category.scores.length - 1].score) {
+          return;
+        } else {
+          category.scores.pop();
+        }
+      }
+
+      let add_index = category.scores.length - 1;
+      for (let i_index = 0; i_index < category.scores.length; i_index += 1) {
+        if (category.scores[i_index].score < this.player.total_energy) {
+          add_index = i_index;
+          break;
+        }
+      }
+
+      category.scores.splice(add_index, 0, {
+        name: this.player.name,
+        added: Date.now(),
+        score: Math.round(this.player.total_energy),
+      });
+    });
+
     this.player = null;
   }
 
@@ -93,6 +130,16 @@ class SocketUserController {
 socket.on('connection', client => {
   console.log("A client has connected!");
 
+  (function() {
+    var oldEmit = client.emit;
+    client.emit = function() {
+      var args = Array.from(arguments);
+      setTimeout(() => {
+        oldEmit.apply(this, args);
+      }, 255);
+    };
+  })();
+
   let user = new SocketUserController(client);
   players[client.id] = user;
 
@@ -100,15 +147,15 @@ socket.on('connection', client => {
     if (typeof username === "string" && common.is_valid_username(username) === null && !user.isPlaying()) {
       user.play(username);
       console.log("A socket is playing with name " + username);
-      
+
       let spawn_loc;
       while (true) {
         spawn_loc = new common.Vector(Math.floor(Math.random() * 5000) - 1000, Math.floor(Math.random() * 2000 - 2500));
-        
+
         if (!common.canMoveInDir(spawn_loc, new common.Vector(0, 0))) {
           continue;
         }
-        
+
         let is_ok = true;
         while (common.canMoveInDir(spawn_loc, new common.Vector(0, 1))) {
           spawn_loc.setY(spawn_loc.getY() + 1);
@@ -117,11 +164,13 @@ socket.on('connection', client => {
             break;
           }
         }
-        
-        if (is_ok) {break;}
+
+        if (is_ok) {
+          break;
+        }
       }
       user.player.position = spawn_loc;
-      
+
       broadcast_state();
 
       broadcast_message([{
@@ -162,19 +211,12 @@ socket.on('connection', client => {
       weapon.ammo--;
 
       for (let bc_itt = 0; bc_itt < (weapon.conf.additional_barrels + 1); bc_itt++) {
+        common.apply_gun_forces(user.player, new common.Vector(Math.sin(dir), Math.cos(dir)), weapon);
+
         const dir_rad_innac = (Math.random() - 0.5) * ((weapon.conf.additional_barrels + weapon.conf.additional_size * 0.25) / 5);
         const vec = new common.Vector(Math.sin(dir + dir_rad_innac), Math.cos(dir + dir_rad_innac));
-        const is_grounded = common.is_on_ground(user.player.position);
-  
-        user.player.velocity = vec.mult(
-          new common.Vector(is_grounded ? 40 : 30, is_grounded ? 40 : 30).add(new common.Vector(weapon.conf.additional_launching_power * 3, weapon.conf.additional_launching_power * 3))
-        ).negate();
 
-        if (weapon.conf.suck_mode) {
-          user.player.velocity = user.player.velocity.negate();
-        }
-  
-  
+
         let ray = new common.Ray();
         ray.starting_pos = user.player.position.clone().add(new common.Vector(common.conf.player_size / 2, common.conf.player_size / 2)).add(vec.mult(new common.Vector(3, 3)));
         ray.max_dist = Math.max(500 + (weapon.conf.additional_callibur * 200) - (weapon.conf.additional_barrels * 50), 100);
@@ -182,7 +224,7 @@ socket.on('connection', client => {
         ray.size = 3 + weapon.conf.additional_size * 3;
 
         ray.gravity = weapon.conf.bullet_gravity;
-  
+
         ray.extra_check = function() {
           let return_val = true;
           for (let sock_uuid in players) {
@@ -205,9 +247,9 @@ socket.on('connection', client => {
                     }
                   ]);
                 }
-                
+
                 let gained_energy = damage / 5;
-  
+
                 user.player.energy += gained_energy;
                 user.player.total_energy += gained_energy;
                 user.sendMessage([{
@@ -223,7 +265,7 @@ socket.on('connection', client => {
                     text: " energy!"
                   }
                 ]);
-  
+
                 ouser.player.velocity = new common.Vector(0, -20).add(ray.direction.mult(new common.Vector(25, 25)));
                 ouser.damage_player(damage, [
                   [{
@@ -240,10 +282,10 @@ socket.on('connection', client => {
               }
             }
           }
-  
+
           common.world.power_up_boxes.forEach((box_pos, i) => {
             const box_data = power_up_crystal_data[i];
-  
+
             if (box_data.health > 0) {
               if (ray.pos.distance(new common.Vector(box_pos.x, box_pos.y)) < 100) {
                 box_data.health--;
@@ -254,7 +296,7 @@ socket.on('connection', client => {
           return return_val;
         }
         ray.world_collidable = user.player.current_power_up !== "faze_bullet";
-  
+
         ray.trace();
         ray_list.push(ray);
       }
@@ -270,6 +312,8 @@ socket.on('connection', client => {
           beam_size: ray.size
         }
       }));
+      
+      user.player.action_ack_id = data.action_ack_id;
       broadcast_state();
     }
   });
@@ -280,14 +324,14 @@ socket.on('connection', client => {
 
       if (dir_vec !== undefined && dir_vec !== null) {
         if (true) {
-          if (dir_vec.getX() != 0) {
+          if (dir_vec.getX() !== 0) {
             user.player.velocity.setX(dir_vec.getX() * 20);
           }
 
-          if (dir_vec.getY() != 0) {
+          if (dir_vec.getY() !== 0) {
             user.player.velocity.setY(dir_vec.getY() * 20);
           }
-          
+
           if (!common.is_on_ground(user.player.position)) {
             user.player.can_use_rush = false;
           }
@@ -303,13 +347,13 @@ socket.on('connection', client => {
       broadcast_state();
     }
   });
-  
+
   client.on("use_power_up", _ => {
     if (user.isPlaying() && user.player.power_up_slot !== null) {
       user.player.current_power_up = user.player.power_up_slot;
       user.player.power_up_time_left = common.powerup_types[user.player.power_up_slot].duration;
       user.player.power_up_slot = null;
-      
+
       if (user.player.current_power_up === "instant_heal") {
         user.player.health = 20;
       } else if (user.player.current_power_up === "launch") {
@@ -368,7 +412,7 @@ socket.on('connection', client => {
         }
       ]);
 
-
+      user.dead();
     }
 
     delete players[client.id];
@@ -402,7 +446,7 @@ setInterval(_ => {
       if (!user.player.can_use_rush && (common.is_on_ground(user.player.position) || user.player.current_power_up === "infinite_dashes")) {
         user.player.can_use_rush = true;
       }
-      
+
       if (user.player.current_power_up === "unlimited_ammo") {
         user.player.weapons.forEach(weapon => {
           if (weapon.ammo < 2) {
@@ -460,12 +504,10 @@ setInterval(_ => {
         user.player.weapons.forEach(function(weapon) {
           weapon.ammo = 2;
         });
-        user.damage_player(2, [
-          {
-            "color": "red",
-            "text": "You died by void damage"
-          }
-        ]);
+        user.damage_player(2, [{
+          "color": "red",
+          "text": "You died by void damage"
+        }]);
         broadcast_state();
       }
     }
@@ -487,13 +529,13 @@ setInterval(_ => {
       }
     }
   });
-  
+
   for (let socket_uuid in players) {
     const user = players[socket_uuid];
     if (user !== null && user.isPlaying()) {
       if (user.player.current_power_up !== null) {
         user.player.power_up_time_left--;
-        
+
         if (user.player.power_up_time_left <= 0) {
           user.player.current_power_up = null;
         }
@@ -519,6 +561,7 @@ function broadcast_state(single_user_only, user_added_data, global_added_data) {
       let ud = {
         pub_uuid: user.pub_uuid,
         name: user.player.name,
+        action_ack_id: user.player.action_ack_id,
         pX: user.player.position.getX(),
         pY: user.player.position.getY(),
         vX: user.player.velocity.getX(),
@@ -561,5 +604,16 @@ function broadcast_state(single_user_only, user_added_data, global_added_data) {
   }
 }
 
-server.listen(8080);
-console.log("Game is online on port 8080!");
+setInterval(() => {
+  leaderboard_data.forEach(category => {
+    category.scores = category.scores.filter(score => {
+      return score.added + category.m_duration * (1000 * 60) > Date.now()
+    });
+  });
+  fs.writeFile(leaderboard_path, JSON.stringify(leaderboard_data), 'utf-8', function() {
+    console.log("Saved leaderboard!");
+  });
+}, 1000 * 30);
+
+server.listen(80);
+console.log("Game is online on port 80!");

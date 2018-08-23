@@ -91,9 +91,9 @@
       this.cloud_layers.reverse();
     }
 
-    draw() {
+    draw(h) {
       this.cloud_layers.forEach(layer => {
-        layer.draw();
+        layer.draw(h);
       });
     }
   }
@@ -107,15 +107,14 @@
 
       this.seg_spacing = 50;
       this.scroll_y = 0;
-      this.cloud_seg_heights = new Array(200).fill(0).map(_ => Math.random() * 100);
+      this.cloud_seg_heights = new Array(100).fill(0).map(_ => Math.random() * 100);
     }
 
     get_seg_xpos(seg_index) {
       return this.scroll_y + this.seg_spacing * seg_index;
     }
 
-    draw() {
-      const height = this.ctx.canvas.height;
+    draw(height) {
       this.ctx.save();
       this.ctx.fillStyle = this.color;
 
@@ -425,7 +424,7 @@
           other_player.position.getX() > client.player.position.getX() && !look_lt
         )) {
           const player_dist = Math.abs(other_player.position.getX() - client.player.position.getX());
-          const axis_dist = Math.abs(other_player.position.getY() - client.camera.toWorldPos(line_pos, client.canvas.width, client.canvas.height).getY());
+          const axis_dist = Math.abs(other_player.position.getY() - client.camera.toWorldPos(line_pos, client.getWidth(), client.getHeight()).getY());
           rheight += Math.max(
             (-Math.pow(axis_dist / 100, 2) + 40) + (-Math.pow(player_dist / 400, 2) + 50),
           0);
@@ -448,7 +447,7 @@
     ctx.restore();
   }
 
-  exports.draw_text_colored = function(ctx, text, x, y, font_style, calculated_line_height, no_center) {
+  exports.draw_text_colored = function(client, ctx, text, x, y, font_style, calculated_line_height, no_center) {
     let cy = y;
     text.forEach(line => {
       let cw = 0;
@@ -460,16 +459,47 @@
       });
 
       let cx = !no_center ? x - cw / 2 : x;
+      
+      function resolve_color(col) {
+        if (col === "THEME_IMPORTANT") {
+          return `hsl(${Date.now() / 20}deg, 100%, 75%)`
+        } else {
+          return col;
+        }
+      }
       line.forEach(component => {
         ctx.save();
         ctx.textAlign = "left";
+        ctx.textBaseline = "top";
         ctx.font = font_style;
+        
+        const selection_rect_pos = [cx, cy];
+        const selection_rect_size = [ctx.measureText(component.text).width, calculated_line_height];
+        
+        const is_hovered = rebound_common.testrectcollision(selection_rect_pos[0], selection_rect_pos[1], selection_rect_size[0], selection_rect_size[1], client.mouse_pos.getX(), client.mouse_pos.getY(), 1, 1);
+        
+        if (typeof component.click_action === "function" || typeof component.click_action === "string") {
+          ctx.fillStyle = resolve_color(component.click_underline);
+          ctx.fillRect(cx, cy + calculated_line_height + (is_hovered ? 5 : 0), ctx.measureText(component.text).width, 5);
+          
+          if (is_hovered) {
+            client.pointer_mode = "pointer";
+            if (client.mousedown_frame) {
+              if (typeof component.click_action === "string") {
+                open(component.click_action); 
+              } else {
+                component.click_action();
+              }
+            }
+          }
+        }
 
         if (typeof component.bg == "string") {
-          ctx.fillStyle = component.bg;
-          ctx.fillRect(cx, cy, ctx.measureText(component.text).width, calculated_line_height);
+          ctx.fillStyle = resolve_color(component.bg);
+          ctx.fillRect(selection_rect_pos[0], selection_rect_pos[1], selection_rect_size[0], selection_rect_size[1]);
         }
-        ctx.fillStyle = component.color;
+        
+        ctx.fillStyle = resolve_color(component.color);
         ctx.strokeStyle = component.color;
 
         ctx.fillText(component.text, cx, cy);
@@ -513,6 +543,8 @@
       this.frames = 0;
       this.fps = -719;
       this.total_frames = 0;
+      this.mousedown_frame = false;
+      this.pointer_mode = "default";
 
       this.init();
       this.tick();
@@ -568,6 +600,7 @@
     mouse_down_handler(e) {
       if (e.button === 0) {
         this.mousedown = true;
+        this.mousedown_frame = true;
       }
       
       if (e.button === 2) {
@@ -607,10 +640,20 @@
       }
 
       this.total_frames += 1;
+      
+      this.pointer_mode = "default";
+      
       this.update(dt, ticks_passed);
       this.render(this.ctx, this.getWidth(), this.getHeight());
+      
+      if (this.pointer_mode !== this.canvas.style.cursor) {
+        this.canvas.style.cursor = this.pointer_mode;
+      }
+      
       this.last_tick = Date.now();
       this.last_open_play_dialog = 0;
+      
+      this.mousedown_frame = false;
     }
 
     getWidth() {

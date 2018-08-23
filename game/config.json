@@ -6,35 +6,50 @@
     "player_size": 40,
     "title_screen_title": "Heat Gun",
     "title_screen_instructions": [
+      [
+        {
+          "color": "#3f3d3fdd",
+          "text": " Heat Gun is in public beta! ",
+          "bg": "THEME_IMPORTANT"
+        },
+        {
+          "color": "#fff",
+          "text": "  "
+        },
+        {
+          "color": "#667baa",
+          "bg": "#292f3d",
+          "text": " Join the Discord server ",
+          "click_underline": "#4e5fa0",
+          "click_action": "https://www.discord.gg/cMg6Mky"
+        }
+      ],
+      [],
       [{
-          "color": "gold",
-          "text": "==="
+          "color": "yellow",
+          "text": "==>"
         },
         {
-          "color": "red",
+          "color": "THEME_IMPORTANT",
           "text": " Instructions "
-        },
-        {
-          "color": "gold",
-          "text": "==="
         }
       ],
       [{
-        "color": "gray",
-        "text": "Kill other players or they will kill you!"
+        "color": "#fff",
+        "text": "Kill players to gain the energy used to upgrade your weapons"
+      }],
+      [{
+        "color": "#fff",
+        "text": "and heighten your rank on the leaderboard."
       }],
       [],
       [{
-          "color": "gold",
-          "text": "==="
+          "color": "yellow",
+          "text": "==>"
         },
         {
-          "color": "red",
+          "color": "THEME_IMPORTANT",
           "text": " Controls "
-        },
-        {
-          "color": "gold",
-          "text": "==="
         }
       ],
       [{
@@ -46,7 +61,7 @@
           "text": " ⁍ "
         },
         {
-          "color": "gray",
+          "color": "#fff",
           "text": " Fire weapon"
         }
       ],
@@ -59,7 +74,7 @@
           "text": " ⁍ "
         },
         {
-          "color": "gray",
+          "color": "#fff",
           "text": " Slow player speed"
         }
       ],
@@ -72,7 +87,7 @@
           "text": " ⁍ "
         },
         {
-          "color": "gray",
+          "color": "#fff",
           "text": " Select 1st weapon"
         }
       ],
@@ -85,7 +100,7 @@
           "text": " ⁍ "
         },
         {
-          "color": "gray",
+          "color": "#fff",
           "text": " Select 2nd weapon"
         }
       ],
@@ -98,7 +113,7 @@
         "text": " ⁍ "
       },
       {
-        "color": "gray",
+        "color": "#fff",
         "text": " Dash (Also works in the air)"
       }],
       [{
@@ -110,13 +125,14 @@
         "text": " ⁍ "
       },
       {
-        "color": "gray",
+        "color": "#fff",
         "text": " Select weapon trait (up down)"
       }],
       [{
-        "color": "gray",
+        "color": "#fff",
         "text": "         Upgrade / Downgrade (left right)"
       }],
+      [],
       [{
         "color": "gold",
         "text": "r key"
@@ -126,19 +142,19 @@
         "text": " ⁍ "
       },
       {
-        "color": "gray",
+        "color": "#fff",
         "text": " Toggle render mode"
       }],
-      [],
       [{
-          "color": "magenta",
-          "text": "May 26 "
-        },
-        {
-          "color": "purple",
-          "text": "A large suprise awaits..."
-        }
-      ]
+        "color": "red",
+        "text": "         WARNING: The 3D isn't optimized yet!"
+      }],
+      [{
+        "color": "red",
+        "text": "         If you are lagging, press this key."
+      }],
+      [],
+      []
     ],
     "screen_bg": "radial-gradient(#b5b5b5, #eee)",
     "building_commands_enabled": true
