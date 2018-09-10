@@ -9,7 +9,7 @@
 
     ctx.save();
     if (player.current_power_up === "invisibility") {
-      ctx.globalAlpha = 0.1;
+      ctx.globalAlpha = 0.025;
     }
     
     let is_inside_any_object = false;
@@ -150,8 +150,9 @@
 
     attach(ctx, w, h) {
       ctx.save();
+      ctx.translate(w/2, h/2);
       ctx.scale(this.zoom, this.zoom);
-      ctx.translate(-Math.floor(this.lookvec.getX()) + w / 2, -Math.floor(this.lookvec.getY()) + h / 2);
+      ctx.translate(-Math.floor(this.lookvec.getX()), -Math.floor(this.lookvec.getY()));
     }
 
     setZoom(f) {
@@ -281,6 +282,11 @@
               ctx.fill();
             } else {
               ctx.fillRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
+              
+              if (layer_name === "dec") {
+                ctx.fillStyle = `rgba(255, 255, 255, ${Math.sin(Date.now() / 100) * 0.05 + 0})`
+                ctx.fillRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
+              }
             }
             
             draw_one_way_arrow();

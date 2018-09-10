@@ -130,15 +130,15 @@ class SocketUserController {
 socket.on('connection', client => {
   console.log("A client has connected!");
 
-  (function() {
+  /*(function() {
     var oldEmit = client.emit;
     client.emit = function() {
       var args = Array.from(arguments);
       setTimeout(() => {
         oldEmit.apply(this, args);
-      }, 255);
+      }, 0);
     };
-  })();
+  })();*/
 
   let user = new SocketUserController(client);
   players[client.id] = user;
@@ -248,7 +248,7 @@ socket.on('connection', client => {
                   ]);
                 }
 
-                let gained_energy = damage / 5;
+                let gained_energy = damage / 3.5;
 
                 user.player.energy += gained_energy;
                 user.player.total_energy += gained_energy;
@@ -312,13 +312,13 @@ socket.on('connection', client => {
           beam_size: ray.size
         }
       }));
-      
+
       user.player.action_ack_id = data.action_ack_id;
       broadcast_state();
     }
   });
 
-  client.on("rush", dir => {
+  client.on("rush", (dir, ackid) => {
     if (user.isPlaying() && user.player.can_use_rush) {
       let dir_vec = common.rush_packet_enum_dirs[dir];
 
@@ -335,6 +335,8 @@ socket.on('connection', client => {
           if (!common.is_on_ground(user.player.position)) {
             user.player.can_use_rush = false;
           }
+
+          user.player.action_ack_id = ackid;
           broadcast_state();
         }
       }
@@ -504,7 +506,7 @@ setInterval(_ => {
         user.player.weapons.forEach(function(weapon) {
           weapon.ammo = 2;
         });
-        user.damage_player(2, [{
+        user.damage_player(1, [{
           "color": "red",
           "text": "You died by void damage"
         }]);
@@ -548,12 +550,17 @@ setInterval(_ => {
   broadcast_state();
 }, 500);
 
+let bsc = 0;
+
 function broadcast_state(single_user_only, user_added_data, global_added_data) {
   let update_data = {
     svr_timestamp: common.get_net_ts(),
     glob_add: global_added_data,
-    player_data: []
+    player_data: [],
+    x: bsc
   }
+
+  bsc += 1;
 
   for (let sock_uuid in players) {
     let user = players[sock_uuid];
@@ -574,7 +581,8 @@ function broadcast_state(single_user_only, user_added_data, global_added_data) {
         death_reason: user.player.death_reason,
         power_up_slot: user.player.power_up_slot,
         current_power_up: user.player.current_power_up,
-        power_up_time_left: user.player.power_up_time_left
+        power_up_time_left: user.player.power_up_time_left,
+        can_rush: user.player.can_use_rush
       }
 
       update_data.player_data.push(ud);

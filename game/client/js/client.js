@@ -8,6 +8,7 @@
 
       this.last_ping = -719;
       this.latest_heartbeat_packet = 0;
+      this.last_heartbeat_time = Date.now();
       this.action_unk_count = 0;
       this.gun_dir = new rebound_common.Vector(0, 1);
       this.gun_anim_back = 0;
@@ -53,10 +54,7 @@
       });
 
       socket.on('new_message', msg => {
-        this.chat_messages.push(msg);
-        this.chat_messages.reverse();
-        this.chat_messages = this.chat_messages.slice(0, 10);
-        this.chat_messages.reverse();
+        this.add_message(msg);
       });
 
       socket.on('add_beams', beams_list => {
@@ -71,6 +69,7 @@
       });
 
       socket.on('heartbeat', data => {
+        this.last_heartbeat_time = Date.now();
         const sv_dt = rebound_common.get_net_ts() - data.svr_timestamp;
 
         if (this.latest_heartbeat_packet > data.svr_timestamp) {
@@ -92,14 +91,16 @@
         if (data.power_up_crystal_data instanceof Array) {
           this.power_up_crystal_data = data.power_up_crystal_data;
         }
+        
+        let number_of_yous = 0;
 
         data.player_data.forEach(player_data => {
           let player;
 
           if (player_data.pub_uuid === data.my_pub_uuid) {
             player = this.player;
-            
-            if (this.player_action_ack_id !== null && this.player_action_ack_id !== player_data.action_ack_id && this.action_unk_count > 4) {
+
+            if (this.player_action_ack_id !== null && this.player_action_ack_id !== player_data.action_ack_id && this.action_unk_count < 2) {
               console.warn("Refusing to update own player, heartbeat doesn't acknowledge action. HB ACK ID =", player_data.action_ack_id, " CLI ACK ID =", this.player_action_ack_id);
               this.action_unk_count += 1;
               return;
@@ -116,7 +117,6 @@
           }
 
           if (player !== undefined && player !== null) {
-
             player.position.setX(player_data.pX);
             player.position.setY(player_data.pY);
 
@@ -132,9 +132,12 @@
             player.power_up_slot = player_data.power_up_slot;
             player.current_power_up = player_data.current_power_up;
             player.power_up_time_left = player_data.power_up_time_left;
+            player.can_use_rush = player_data.can_rush;
 
             // Temporarily disabled due to buggy timestamps
-            // rebound_common.apply_physics(player, sv_ticks);
+            /*for (let x = 0; x < sv_ticks; x++) {
+              rebound_common.apply_physics(player, 1);
+            }*/
           }
         });
 
@@ -146,8 +149,23 @@
       });
     }
 
+    add_message(msg) {
+      this.chat_messages.push(msg);
+      this.chat_messages.reverse();
+      this.chat_messages = this.chat_messages.slice(0, 10);
+      this.chat_messages.reverse();
+    }
+
     update(dt, ticks) {
       if (this.state === "game") {
+        if (this.player !== null) {
+          if (this.player.current_power_up == "infinite_dashes") {
+            this.player.can_use_rush = true;
+          }
+          if (rebound_common.is_on_ground(this.player.position)) {
+            this.player.can_use_rush = true;
+          }
+        }
         if (this.player == null || this.player.health <= 0) {
           this.state = "menu";
 
@@ -155,11 +173,11 @@
 
           this.refresh_leaderboard();
         } else {
-          rebound_common.apply_physics(this.player, rebound_common.round(Math.min(ticks, 3), 2));
+          rebound_common.apply_physics(this.player, ticks);
 
           for (let key in this.other_players) {
             let plr = this.other_players[key];
-            rebound_common.apply_physics(plr, rebound_common.round(Math.min(ticks, 3), 2));
+            rebound_common.apply_physics(plr, ticks);
           }
 
           this.camera.lookvec.setX(this.player.client_interp_position.getX(), 50);
@@ -264,8 +282,24 @@
           rush_pkt_dir = "down";
         }
 
-        if (rush_pkt_dir !== null) {
-          socket.emit('rush', rush_pkt_dir);
+        if (rush_pkt_dir !== null && this.player.can_use_rush) {
+          this.player_action_ack_id = Math.random();
+          
+          const dir_vec = rebound_common.rush_packet_enum_dirs[rush_pkt_dir];
+          
+          if (!rebound_common.is_on_ground(this.player.position)) {
+            this.player.can_use_rush = false;
+          }
+          
+          if (dir_vec.getX() !== 0) {
+            this.player.velocity.setX(dir_vec.getX() * 20);
+          }
+
+          if (dir_vec.getY() !== 0) {
+            this.player.velocity.setY(dir_vec.getY() * 20);
+          }
+          
+          socket.emit('rush', rush_pkt_dir, this.player_action_ack_id);
         }
       }
     }
@@ -411,6 +445,7 @@
       this.cloud_horizon.draw(this.getHeight());
 
       // Scene rendering
+      this.camera.zoom = (this.camera.zoom + (1 - this.player.weapons[this.selected_weapon_index].conf.scope * 0.1)) / 2;
       this.camera.attach(ctx, w, h);
 
       // Render world
@@ -846,6 +881,23 @@
 
         ctx.restore();
       }
+      
+      if (Date.now() - this.last_heartbeat_time > 3000) {
+       ctx.save();
+        
+        ctx.fillStyle = `hsl(${Date.now() / 20}deg, 50%, 50%)`;
+        ctx.fillRect(0, 0, 400, 135);
+        ctx.fillStyle = "white";
+        
+        ctx.font = "20px monospace";
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        
+        ctx.fillText("Server not responding", 200, 67.5);
+        
+        
+        ctx.restore(); 
+      }
     }
 
     get_gun_dir_vec() {
@@ -874,10 +926,5 @@
     canvas.style.background = "radial-gradient(rgb(255, 255, 255), rgb(222, 228, 232))";
     new Game(canvas);
     document.body.appendChild(canvas);
-  });
-
-  socket.on('disconnect', _ => {
-    //alert("You were disconnect from the server. This tab will reload after pressing ok.");
-    //window.location.reload();
   });
 }());

@@ -299,8 +299,8 @@
       this.velocity = new exports.Vector(0, 0);
       this.action_ack_id = null;
       this.health = 20;
-      this.energy = 10;
-      this.total_energy = 10;
+      this.energy = 14;
+      this.total_energy = 14;
       this.can_use_rush = true;
       this.name = name;
       this.lowered_phys = false;
@@ -317,7 +317,8 @@
             additional_launching_power: 0,
             additional_efficiency: 0,
             suck_mode: 0,
-            bullet_gravity: 0
+            bullet_gravity: 0,
+            scope: 0
           }
         },
         {
@@ -330,6 +331,20 @@
             additional_launching_power: 0,
             bullet_gravity: 0,
             suck_mode: 0,
+            scope: 0
+          }
+        },
+        {
+          ammo: 2,
+          conf: {
+            additional_ground_ammo: 0,
+            additional_barrels: 0,
+            additional_size: 0,
+            additional_callibur: 0,
+            additional_launching_power: 0,
+            bullet_gravity: 0,
+            suck_mode: 0,
+            scope: 0
           }
         }
       ]
@@ -377,6 +392,12 @@
       name: "Suck Mode",
       maxval: 1,
       cost: 10
+    },
+    {
+      key: "scope",
+      name: "Scope",
+      maxval: 5,
+      cost: 3
     }
   ]
 
@@ -468,9 +489,9 @@
     },
     faze_bullet: {
       name: "Bullet faze",
-      description: "(fazes through anything!)",
+      description: "(phases through anything!)",
       bg_color: "#aaa",
-      duration: 10,
+      duration: 30,
       rand_repeat: 1
     },
     unlimited_ammo: {
@@ -524,7 +545,7 @@
   exports.conf = {};
 
   exports.get_net_ts = function() {
-    return new Date().getTime();
+    return Date.now();
   }
 
   exports.apply_config = function(conf_jsn) {
