@@ -16,14 +16,16 @@
       
       this.active_color_palette = [
         "#0f0f0f",
-        "#4c4c4c",
-        "#8e8e8e",
-        "#4ae27b",
-        "#58bc78",
-        "#2b964d",
-        "#7c512b",
-        "#84c5e8"
+        "#afafef",
+        "#c1bcb2",
+        "#ad5e3c",
+        "#ad3c3e",
+        "#f4eded",
+        "#1c69a8",
+        "#56472a"
       ];
+      
+      //this.canvas.addEventListener("mousewheel", this.mousewheel.bind(this), false);
 
       this.canvas.addEventListener("mousemove", e => {
         if (this.current_drag_data !== null) {
@@ -31,6 +33,12 @@
           this.camera.lookvec.setY(this.current_drag_data.start_cam_pos.getY() + (this.current_drag_data.start_mouse_pos.getY() - e.clientY), 50);
         }
       });
+    }
+    
+    mousewheel(e) {
+      this.camera.zoom += e.wheelDelta / 1000;
+      this.camera.zoom = Math.min(Math.max(this.camera.zoom, 0.1), 1.5);
+      console.log(this.camera.zoom);
     }
 
     update(dt, ticks) {
@@ -179,8 +187,18 @@
           this.selected_object_index = -1;
           this.multiselect_resolve_items = null;
         }
+        
+        if (e.keyCode === 75) {
+          const obj = this.world.tiles[this.selected_object_index];
+          obj.bullet_phased = !obj.bullet_phased;
+        }
+        
+        if (e.keyCode === 74) {
+          const obj = this.world.tiles[this.selected_object_index];
+          obj.reflective = !obj.reflective;
+        }
 
-        if (e.keyCode === 79 && this.selected_object_index !== -1) {
+        if (e.keyCode === 79) {
           const obj = this.world.tiles[this.selected_object_index];
 
           if (typeof obj.one_way !== typeof 1) {
@@ -233,6 +251,14 @@
 
     app_keyup(e) {
 
+    }
+    
+    get_active_block() {
+      if (this.selected_object_index !== -1) {
+        return this.world.tiles[this.selected_object_index];
+      } else {
+        return null;
+      }
     }
 
     is_hovering_over_movepart() {
@@ -444,7 +470,12 @@
         ctx.globalCompositeOperation = "xor";
         ctx.textAlign = "left";
 
-        ctx.fillText("Move Collisions: " + this.opt_move_collisions + " [Toggle using C] || Grid: " + this.opt_move_grid, 20, h - 20);
+        ctx.fillText("Move Collisions: " + this.opt_move_collisions + " [Toggle using C] || Grid: " + this.opt_move_grid + " || Zoom: " + Math.floor(this.camera.zoom * 100) / 100, 20, h - 20);
+        
+        let active_block = this.get_active_block();
+        if (active_block !== null) {
+          ctx.fillText(`X: ${active_block.x} Y: ${active_block.y}  ||  W: ${active_block.w} H: ${active_block.h}`, 20, h - 40);
+        }
       });
 
       ctx.restore();

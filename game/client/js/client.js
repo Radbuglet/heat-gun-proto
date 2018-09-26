@@ -1,5 +1,7 @@
 (function() {
   const socket = io();
+  
+  const flashblind_filter = "blur(30px) brightness(120%) grayscale(100%)";
 
   class Game extends rebound_helpers.CanvasApplication {
     // Application code
@@ -18,6 +20,7 @@
       this.power_up_crystal_data = [];
       this.cloud_horizon = new rebound_helpers.CloudHorizon(this.ctx);
       this.draw_3d = window.localStorage.opt_use_3d == "1" || window.localStorage.opt_use_3d == null;
+      this.impact_particles = [];
 
       this.player = null;
       this.other_players = {};
@@ -62,9 +65,17 @@
           let beam = {
             path: beam_pkt.beam_path,
             size: beam_pkt.beam_size,
+            lingering_trail: beam_pkt.lingering_trail,
+            color: beam_pkt.color,
             exist_until: Date.now() + 1000
           }
+
           this.beams.push(beam);
+
+          this.impact_particles.push({
+            pos: beam_pkt.beam_path[beam_pkt.beam_path.length - 1],
+            size: new rebound_common.LerpNum((beam_pkt.lingering_trail) * 70, 0, (beam_pkt.lingering_trail + 1) * 800, (beam_pkt.lingering_trail + 1) * 1250)
+          });
         });
       });
 
@@ -91,7 +102,7 @@
         if (data.power_up_crystal_data instanceof Array) {
           this.power_up_crystal_data = data.power_up_crystal_data;
         }
-        
+
         let number_of_yous = 0;
 
         data.player_data.forEach(player_data => {
@@ -126,7 +137,12 @@
             player.health = player_data.health;
             player.energy = player_data.energy;
             player.total_energy = player_data.total_energy;
-            player.weapons = player_data.weapons;
+
+            player.weapons = player_data.weapons.map((weapon, i) => {
+              weapon.cli_internal = player.weapons[i].cli_internal;
+              return weapon;
+            });
+            player.selected_slot = player_data.selected_slot
             player.lowered_phys = player_data.lowered_phys;
             player.death_reason = player_data.death_reason;
             player.power_up_slot = player_data.power_up_slot;
@@ -173,11 +189,11 @@
 
           this.refresh_leaderboard();
         } else {
-          rebound_common.apply_physics(this.player, ticks);
+          rebound_common.apply_physics(this.player, ticks, this.selected_weapon_index);
 
           for (let key in this.other_players) {
             let plr = this.other_players[key];
-            rebound_common.apply_physics(plr, ticks);
+            rebound_common.apply_physics(plr, ticks, plr.selected_slot);
           }
 
           this.camera.lookvec.setX(this.player.client_interp_position.getX(), 50);
@@ -210,6 +226,11 @@
         }
       }
 
+      if (e.code === "KeyR" && !e.shiftKey) {
+        this.draw_3d = !this.draw_3d;
+        window.localStorage.opt_use_3d = this.draw_3d ? "1" : "0";
+      }
+
       if (this.player !== null) {
         let nums = [
           "1", "2", "3", "4", "5", "6", "7", "8", "9"
@@ -217,17 +238,13 @@
           if (index < this.player.weapons.length) {
             if (e.key === key_id) {
               this.selected_weapon_index = index;
+              socket.emit('select_slot', this.selected_weapon_index);
             }
           }
         });
 
-        if (e.code === "KeyR" && !e.shiftKey) {
-          this.draw_3d = !this.draw_3d;
-          window.localStorage.opt_use_3d = this.draw_3d ? "1" : "0";
-        }
-
         if (e.code === "Space") {
-          socket.emit('set_lowered_phys', true);
+          if (!this.player.lowered_phys) socket.emit('set_lowered_phys', true);
         }
 
         if (this.player.power_up_slot !== null && e.code === "KeyP") {
@@ -284,13 +301,13 @@
 
         if (rush_pkt_dir !== null && this.player.can_use_rush) {
           this.player_action_ack_id = Math.random();
-          
+
           const dir_vec = rebound_common.rush_packet_enum_dirs[rush_pkt_dir];
-          
+
           if (!rebound_common.is_on_ground(this.player.position)) {
             this.player.can_use_rush = false;
           }
-          
+
           if (dir_vec.getX() !== 0) {
             this.player.velocity.setX(dir_vec.getX() * 20);
           }
@@ -298,7 +315,7 @@
           if (dir_vec.getY() !== 0) {
             this.player.velocity.setY(dir_vec.getY() * 20);
           }
-          
+
           socket.emit('rush', rush_pkt_dir, this.player_action_ack_id);
         }
       }
@@ -307,7 +324,7 @@
     app_keyup(e) {
       if (this.player !== null) {
         if (e.keyCode === 32 || e.keyCode === 16) {
-          socket.emit('set_lowered_phys', false);
+          if (this.player.lowered_phys) socket.emit('set_lowered_phys', false);
         }
       }
     }
@@ -322,6 +339,9 @@
       if (this.state !== "game") {
         if (this.state === "menu") {
           this.cloud_horizon.draw(this.getHeight());
+
+          this.camera.zoom = 0.7;
+          this.camera.lookvec = new rebound_common.Vector(Math.sin(Date.now() / 3000) * 4000 + 1400, Math.sin(Date.now() / 1000) * 1000);
 
           ctx.save();
           ctx.fillStyle = "#1a1a1a";
@@ -371,7 +391,7 @@
               },
               {
                 "color": "yellow",
-                "text": "Refesh",
+                "text": "Refresh",
                 "click_action": () => {
                   this.refresh_leaderboard();
                 },
@@ -444,8 +464,18 @@
       // Background
       this.cloud_horizon.draw(this.getHeight());
 
+      let is_in_flash = false;
+      let current_flash = null;
+
+      this.impact_particles.forEach((p) => {
+        if (new rebound_common.Vector(p.pos.pX, p.pos.pY).distance(this.player.position) < p.size.getCurrentVal()) {
+          is_in_flash = true;
+          current_flash = p;
+        }
+      });
+
       // Scene rendering
-      this.camera.zoom = (this.camera.zoom + (1 - this.player.weapons[this.selected_weapon_index].conf.scope * 0.1)) / 2;
+      this.camera.zoom = ((this.camera.zoom + (1 - this.player.weapons[this.selected_weapon_index].conf.scope * 0.08)) / 2)// + (is_in_flash ? 0.8 : 0);
       this.camera.attach(ctx, w, h);
 
       // Render world
@@ -458,6 +488,13 @@
       for (let player_pub_uuid in this.other_players) {
         const player = this.other_players[player_pub_uuid];
         rebound_helpers.draw_player(ctx, player, true);
+        
+        /*if (Math.abs(this.get_gun_dir_vec() - this.player.position.sub(player.position).getdeg()) < 3) {
+          ctx.save();
+          ctx.fillStyle = "red";
+          ctx.fillRect(player.position.getX(), player.position.getY(), 10, 10)
+          ctx.restore();
+        }*/
         /*const is_on_ground = rebound_common.is_on_ground(player.position);
         rebound_helpers.draw_gun(ctx, player.position.add(new rebound_common.Vector(rebound_common.conf.player_size / 2, rebound_common.conf.player_size / 2)),
           ((!is_on_ground) ? player.velocity.normalized() :
@@ -470,11 +507,12 @@
       let temp_beams = [];
       this.beams.forEach((beam, i) => {
         ctx.save();
-        ctx.strokeStyle = "red";
+        ctx.strokeStyle = beam.color;
         ctx.lineWidth = beam.size * 2;
         if (!(beam.path[0] instanceof rebound_common.Vector) && beam.path[1] !== undefined) {
           beam.path[0] = new rebound_common.Vector(beam.path[0].pX, beam.path[0].pY);
-          const bdst = beam.path[0].distance(new rebound_common.Vector(beam.path[1].pX, beam.path[1].pY)) * 0.2;
+
+          const bdst = (beam.path[0].distance(new rebound_common.Vector(beam.path[1].pX, beam.path[1].pY)) * 0.2) * (beam.lingering_trail + 1);
           beam.path[0].setX(beam.path[1].pX, bdst);
           beam.path[0].setY(beam.path[1].pY, bdst);
         }
@@ -507,20 +545,63 @@
 
       this.beams = temp_beams;
 
+
+      this.impact_particles = this.impact_particles.filter((p) => {
+        return p.size.getCurrentVal() > 0
+      });
+
+      this.impact_particles.forEach((p) => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.fillStyle = "#fff";
+        ctx.globalAlpha = 0.9;
+        ctx.arc(p.pos.pX, p.pos.pY, p.size.getCurrentVal(), 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.restore();
+      })
+
       const gun_pos = this.player.position.add(new rebound_common.Vector(rebound_common.conf.player_size / 2, rebound_common.conf.player_size / 2));
 
       if (this.player.lowered_phys) {
         ctx.save();
-        ctx.globalCompositeOperation = "xor";
-        ctx.strokeStyle = "red";
+        ctx.strokeStyle = "green";
         ctx.globalAlpha = 0.5;
         ctx.lineWidth = 5;
         ctx.beginPath();
+        
+        let weapon = this.player.weapons[this.selected_weapon_index];
+        let ray = new rebound_common.Ray();
+        ray.chkstep = 3;
+        ray.starting_pos = gun_pos.clone().div(new rebound_common.Vector(ray.chkstep, ray.chkstep)).floor().mult(new rebound_common.Vector(ray.chkstep, ray.chkstep));
+        ray.max_dist = 2000;
+        ray.max_dist = Math.max(1000 + (weapon.conf.additional_callibur * 200) - (weapon.conf.additional_barrels * 75), 100) + (weapon.conf.bullet_gravity * 200);
+        ray.direction = this.get_gun_dir_vec().clone();
+        ray.size = 5 + weapon.conf.additional_size * 3;
+        ctx.lineWidth = ray.size;
+        
+        ray.gravity = Math.max((weapon.conf.bullet_gravity * 0.5 - (weapon.conf.additional_callibur * 0.1)), 0);
+        
+        ctx.moveTo(ray.starting_pos.getX(), ray.starting_pos.getY());
+        
+        ray.extra_check = () => {
+          ctx.lineTo(ray.pos.getX(), ray.pos.getY());
+          
+          for (const key in this.other_players) {
+            const oplayer = this.other_players[key];
+            
+            
+            if (rebound_common.testrectcollision(ray.pos.getX() - 2, ray.pos.getY() - 2, 4, 4, oplayer.position.getX(), oplayer.position.getY(), rebound_common.conf.player_size, rebound_common.conf.player_size)) {
+              ctx.strokeStyle = "red";
+              return false;
+            }
+          }
+          
+          return true;
+        }
+        
+        ray.trace();
 
-        ctx.moveTo(gun_pos.getX(), gun_pos.getY());
-        const gun_laser_end = gun_pos.clone();
-        gun_laser_end.mutadd(this.gun_dir.mult(new rebound_common.Vector(5000, 5000)));
-        ctx.lineTo(gun_laser_end.getX(), gun_laser_end.getY());
+
         ctx.stroke();
 
         ctx.restore();
@@ -567,6 +648,8 @@
       for (let hpl = 0; hpl < 20; hpl++) {
         const wid = (bar_w / 20);
         const pos = bar_x + hpl * wid;
+        
+        // @TODO you can use `hsl()` color function instead of this crazy thing!
         const col = rebound_common.hslToRgb((hpl / 50 + Date.now() / 10000) % 1,
           hpl <= Math.floor(this.player.health) ? 0.9 : 0.05,
           0.5);
@@ -714,26 +797,33 @@
       const weapon_item_in_between = 20;
       const weapon_ui_padding = 50;
 
-      const weapons_start = h - (this.player.weapons.length * (weapon_item_height + weapon_item_in_between)) - weapon_ui_padding;
-      const weapon_x_pos = w - weapon_item_width - weapon_ui_padding;
+      const weapons_x_start = w / 2 - ((this.player.weapons.length * (weapon_item_width + weapon_item_in_between)) - weapon_ui_padding) / 2;
+      const weapon_y_pos = h - 200;
 
       this.player.weapons.forEach((weapon, index) => {
         ctx.save();
         ctx.fillStyle = this.selected_weapon_index === index ? `hsl(${Date.now() / 20}deg, 30%, 50%)` : `#3f3d3fdd`;
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 3;
-        const weapon_y_coord = weapons_start + (weapon_item_height + weapon_item_in_between) * index;
-
-        ctx.strokeRect(weapon_x_pos, weapons_start + (weapon_item_height + weapon_item_in_between) * index, weapon_item_width, weapon_item_height);
-        ctx.fillRect(weapon_x_pos, weapons_start + (weapon_item_height + weapon_item_in_between) * index, weapon_item_width, weapon_item_height);
+        let is_usable = weapon.ammo > 0 && weapon.cli_internal.back_anim <= 0;
+        const weapon_x_coord = weapons_x_start + (weapon_item_width + weapon_item_in_between) * index;
+        
+        if (!is_usable) {
+          ctx.fillStyle = this.selected_weapon_index === index ? "#f72e13" : "#872215";
+        }
+        ctx.strokeRect(weapon_x_coord, weapon_y_pos, weapon_item_width, weapon_item_height);
+        ctx.fillRect(weapon_x_coord, weapon_y_pos, weapon_item_width, weapon_item_height);
 
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillStyle = "#fff";
         ctx.font = "15px monospace";
+        ctx.fillStyle = "#fff";
+        if (is_usable) {
+          ctx.font = "bold 15px monospace";
+        }
         ctx.fillText(
-          index + 1 + " | +" + weapon.conf.additional_callibur + " Pow +" + weapon.conf.additional_barrels + " Barrels",
-          weapon_x_pos + 15, weapon_y_coord + weapon_item_height / 2);
+          index + 1 + " [" + weapon.ammo + "] " + new Array(Math.floor(weapon.cli_internal.back_anim / 4)).fill("*").join(""),
+          weapon_x_coord + 15, weapon_y_pos + weapon_item_height / 2);
         ctx.restore();
       });
 
@@ -746,7 +836,7 @@
       const weapon_traitconf_padding = 50;
       const weapon_traitconf_x_pos = w - weapon_traitconf_item_width - weapon_traitconf_padding;
 
-      const weapons_traitconf_start = weapons_start - (traits_visible * (weapon_traitconf_item_height + weapon_traitconf_item_in_between)) - weapon_traitconf_padding;
+      const weapons_traitconf_start = h - (traits_visible * (weapon_traitconf_item_height + weapon_traitconf_item_in_between)) - weapon_traitconf_padding;
 
       rebound_common.weapon_configurables.forEach((configurable, index) => {
         function draw_hint_key(char, x, y) {
@@ -836,7 +926,7 @@
 
 
       // @TODO put in update
-      if (this.mousedown && this.gun_anim_back < 5) {
+      if (this.mousedown && this.player.weapons[this.selected_weapon_index].cli_internal.back_anim === 0) {
         this.player_action_ack_id = Date.now() + Math.random();
 
         if (this.player.weapons[this.selected_weapon_index].ammo > 0) {
@@ -845,16 +935,16 @@
             selected_weapon: this.selected_weapon_index,
             action_ack_id: this.player_action_ack_id
           });
-          this.gun_anim_back = 15 + (this.player.weapons[this.selected_weapon_index].conf.additional_callibur * 5);
-          rebound_common.apply_gun_forces(this.player, this.get_gun_dir_vec(), this.player.weapons[this.selected_weapon_index]);
+          this.player.weapons[this.selected_weapon_index].cli_internal.back_anim = 15 + (this.player.weapons[this.selected_weapon_index].conf.additional_callibur * 7) + (this.player.weapons[this.selected_weapon_index].conf.additional_callibur * 5) + (this.player.weapons[this.selected_weapon_index].conf.lingering_trails * 5) + (this.player.weapons[this.selected_weapon_index].conf.teleportation * 40) + (this.player.weapons[this.selected_weapon_index].conf.additional_launching_power * 5);
+          rebound_common.apply_gun_forces(this.player, this.get_gun_dir_vec(), this.player.weapons[this.selected_weapon_index], this);
         }
       }
 
-      ctx.restore();
+      this.player.weapons.forEach(weapon => {
+        if (weapon.cli_internal.back_anim > 0) weapon.cli_internal.back_anim--;
+      });
 
-      if (this.gun_anim_back > 0) {
-        this.gun_anim_back--;
-      }
+      ctx.restore();
 
       if (this.player.power_up_slot !== null || this.player.current_power_up !== null) {
         const power_up_type = rebound_common.powerup_types[this.player.power_up_slot || this.player.current_power_up];
@@ -881,22 +971,34 @@
 
         ctx.restore();
       }
-      
+
       if (Date.now() - this.last_heartbeat_time > 3000) {
-       ctx.save();
-        
+        ctx.save();
+
         ctx.fillStyle = `hsl(${Date.now() / 20}deg, 50%, 50%)`;
         ctx.fillRect(0, 0, 400, 135);
         ctx.fillStyle = "white";
-        
+
         ctx.font = "20px monospace";
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
-        
+
         ctx.fillText("Server not responding", 200, 67.5);
-        
-        
-        ctx.restore(); 
+
+
+        ctx.restore();
+      }
+
+      if (is_in_flash) {
+        if (!this.has_flashblind_filter()) {
+          this.canvas.style.filter = flashblind_filter;
+          this.canvas.style.transition = "filter 1s";
+        }
+      } else {
+        if (this.has_flashblind_filter()) {
+          this.canvas.style.filter = "none";
+          this.canvas.style.transition = "filter 4s";
+        }
       }
     }
 
@@ -906,6 +1008,10 @@
 
     get_gun_dir_deg() {
       return this.get_gun_dir_vec().getdeg();
+    }
+    
+    has_flashblind_filter() {
+      return this.canvas.style.filter == flashblind_filter;
     }
 
     refresh_leaderboard() {

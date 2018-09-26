@@ -156,8 +156,7 @@
       [],
       []
     ],
-    "screen_bg": "radial-gradient(#b5b5b5, #eee)",
-    "building_commands_enabled": true
+    "screen_bg": "radial-gradient(#b5b5b5, #eee)"
   },
   "map_data": {
     "power_up_boxes": [{

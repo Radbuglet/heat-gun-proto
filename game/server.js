@@ -204,26 +204,39 @@ socket.on('connection', client => {
       if (typeof data.selected_weapon !== typeof 1 || data.selected_weapon > user.player.weapons.length) {
         return;
       }
+      
+      if (data.selected_weapon !== user.player.selected_slot) {
+        user.player.selected_slot = data.selected_weapon;
+      }
 
       const ray_list = [];
       const weapon = user.player.weapons[data.selected_weapon];
       if (weapon.ammo <= 0) return;
       weapon.ammo--;
-
+      
+      let has_set_vel = false;
       for (let bc_itt = 0; bc_itt < (weapon.conf.additional_barrels + 1); bc_itt++) {
-        common.apply_gun_forces(user.player, new common.Vector(Math.sin(dir), Math.cos(dir)), weapon);
+        if (!has_set_vel) {
+          common.apply_gun_forces(user.player, new common.Vector(Math.sin(dir), Math.cos(dir)), weapon);
+          has_set_vel = true;
+        }
 
-        const dir_rad_innac = (Math.random() - 0.5) * ((weapon.conf.additional_barrels + weapon.conf.additional_size * 0.25) / 5);
+        const dir_rad_innac = (Math.random() - 0.75) * ((weapon.conf.additional_barrels + weapon.conf.additional_size * 0.1) / 5);
         const vec = new common.Vector(Math.sin(dir + dir_rad_innac), Math.cos(dir + dir_rad_innac));
+        
+        if (!common.canMoveInDir(user.player.position, common.get_teleportation_vec(vec, weapon.conf.teleportation))) {
+          user.damage_player(common.get_teleportation_punish(weapon.conf.teleportation));
+          return;
+        }
 
 
         let ray = new common.Ray();
         ray.starting_pos = user.player.position.clone().add(new common.Vector(common.conf.player_size / 2, common.conf.player_size / 2)).add(vec.mult(new common.Vector(3, 3)));
-        ray.max_dist = Math.max(500 + (weapon.conf.additional_callibur * 200) - (weapon.conf.additional_barrels * 50), 100);
+        ray.max_dist = Math.max(1000 + (weapon.conf.additional_callibur * 200) - (weapon.conf.additional_barrels * 75), 100) + (weapon.conf.bullet_gravity * 200);
         ray.direction = vec;
-        ray.size = 3 + weapon.conf.additional_size * 3;
+        ray.size = 5 + weapon.conf.additional_size * 3;
 
-        ray.gravity = weapon.conf.bullet_gravity;
+        ray.gravity = Math.max((weapon.conf.bullet_gravity * 0.5 - (weapon.conf.additional_callibur * 0.1)), 0);
 
         ray.extra_check = function() {
           let return_val = true;
@@ -235,7 +248,7 @@ socket.on('connection', client => {
                   ouser.player.position.getX(), ouser.player.position.getY(),
                   common.conf.player_size, common.conf.player_size
                 )) {
-                let damage = Math.max(2 + (weapon.conf.additional_callibur * 1.25) - (weapon.conf.additional_barrels * 0.25), 3);
+                let damage = Math.max(2 + (weapon.conf.additional_callibur * 2) + (weapon.conf.additional_barrels * 7), 3) / (weapon.conf.additional_barrels + 1);
                 if (ouser.player.health - damage <= 0) {
                   broadcast_message([{
                       color: "darkred",
@@ -248,7 +261,7 @@ socket.on('connection', client => {
                   ]);
                 }
 
-                let gained_energy = damage / 3.5;
+                let gained_energy = damage / 4;
 
                 user.player.energy += gained_energy;
                 user.player.total_energy += gained_energy;
@@ -258,15 +271,19 @@ socket.on('connection', client => {
                   },
                   {
                     color: "green",
-                    text: gained_energy
+                    text: Math.floor(gained_energy)
                   },
                   {
                     color: "darkgreen",
                     text: " energy!"
+                  },
+                  {
+                    color: "red",
+                    text: " Damage dealt: " +  damage
                   }
                 ]);
 
-                ouser.player.velocity = new common.Vector(0, -20).add(ray.direction.mult(new common.Vector(25, 25)));
+                ouser.player.velocity = new common.Vector(0, weapon.conf.lingering_trails > 0 ? -2 : -20).add(ray.direction.mult(new common.Vector(weapon.conf.lingering_trails > 0 ? 5 : 25, weapon.conf.lingering_trails > 0 ? 5 : 25)));
                 ouser.damage_player(damage, [
                   [{
                       color: "darkgray",
@@ -309,12 +326,26 @@ socket.on('connection', client => {
               pY: p.getY()
             }
           }),
-          beam_size: ray.size
+          beam_size: ray.size,
+          color: `hsl(${(weapon.conf.trail_color / 10) * 360}, 90%, 50%)`,
+          lingering_trail: weapon.conf.lingering_trails + (user.player.current_power_up === "flashy_bullets" ? 4 : 0)
         }
       }));
 
       user.player.action_ack_id = data.action_ack_id;
       broadcast_state();
+    }
+  });
+  
+  client.on("slot_change", i => {
+        if (user.isPlaying()) {
+      if (typeof i !== typeof 1 || i > user.player.weapons.length) {
+        return;
+      }
+      
+      if (i !== user.player.selected_slot) {
+        user.player.selected_slot = i;
+      }
     }
   });
 
@@ -442,7 +473,7 @@ setInterval(_ => {
     const user = players[socket_uuid];
     if (user !== null && user.isPlaying()) {
       // Phys application
-      common.apply_physics(user.player, ticks_passed);
+      common.apply_physics(user.player, ticks_passed, user.player.selected_slot);
 
       // Rush controller
       if (!user.player.can_use_rush && (common.is_on_ground(user.player.position) || user.player.current_power_up === "infinite_dashes")) {
@@ -457,13 +488,14 @@ setInterval(_ => {
           }
         });
       }
+      
+      if (total_update_ticks % 100 === 0 && user.player.health < 20) {
+        user.player.health += 1;
+      }
 
       if (common.is_on_ground(user.player.position)) {
         let changed = false;
 
-        if (total_update_ticks % 100 === 0 && user.player.health < 20) {
-          user.player.health += 0.25;
-        }
         user.player.weapons.forEach(weapon => {
           if (weapon.ammo < 2) {
             weapon.ammo = 2;
@@ -506,10 +538,11 @@ setInterval(_ => {
         user.player.weapons.forEach(function(weapon) {
           weapon.ammo = 2;
         });
-        user.damage_player(1, [{
+        // @TODO
+        /*user.damage_player(1, [{
           "color": "red",
           "text": "You died by void damage"
-        }]);
+        }]);*/
         broadcast_state();
       }
     }
@@ -582,6 +615,7 @@ function broadcast_state(single_user_only, user_added_data, global_added_data) {
         power_up_slot: user.player.power_up_slot,
         current_power_up: user.player.current_power_up,
         power_up_time_left: user.player.power_up_time_left,
+        selected_slot: user.player.selected_slot,
         can_rush: user.player.can_use_rush
       }
 

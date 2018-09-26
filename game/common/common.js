@@ -127,7 +127,7 @@
 
       return Math.sqrt(a * a + b * b);
     }
-    
+
     getdeg() {
       return exports.todeg(Math.atan2(this.getX(), this.getY()));
     }
@@ -192,6 +192,7 @@
   exports.Ray = class {
     constructor() {
       this.starting_pos = new exports.Vector(0, 0);
+      this.chkstep = 1;
       this.pos = this.starting_pos.clone();
       this.direction = new exports.Vector(0, 0);
       this.max_dist = 8;
@@ -199,7 +200,7 @@
       this.size = 1;
 
       this.gravity = 0;
-      
+
       this.extra_check = function() {
         return true;
       };
@@ -212,14 +213,19 @@
     trace() {
       const pos_sub = this.get_size_vec().div(new exports.Vector(2, 2));
       const size_vec = this.get_size_vec();
-      this.hidden_dy = this.direction.getY();
+      this.hidden_dy = this.direction.normalized().getY();
 
       this.path = [this.starting_pos.clone(new exports.Vector(this.size, this.size))];
       this.pos = this.starting_pos.clone();
+      
+      let step = 0;
+
       for (let d = 0; d < this.max_dist; d++) {
-        if (this.extra_check()) {
-          let collided_with = exports.canMoveInDirROBJ(this.pos.sub(pos_sub), this.direction, size_vec);
-          if (collided_with === null || !this.world_collidable) {
+        let should_check = step % this.chkstep === 0;
+        if (should_check ? this.extra_check() : true) {
+          let collided_with = should_check ? exports.canMoveInDirROBJ(this.pos.sub(pos_sub), this.direction, size_vec) : null;
+          
+          if (collided_with === null || !this.world_collidable || collided_with.bullet_phased) {
             this.pos.mutadd(this.direction.normalized());
             this.hidden_dy += this.gravity / 1000;
 
@@ -244,14 +250,20 @@
         } else {
           break;
         }
+        
+        step += 1;
       }
 
       this.path.push(this.pos.clone());
     }
   }
 
-  exports.apply_physics = function(player, ticks) {
-    let c = (player.lowered_phys ? 0.2 : 0.8);
+  exports.apply_physics = function(player, ticks, selected_item_slot, is_in_flash) {
+    let c = (player.lowered_phys ? 0.2 : 0.8) + (player.weapons[selected_item_slot].conf.additional_launching_power * 0.06);
+
+    if (player.lowered_phys) {
+      c = 0;
+    }
     ticks = ticks * c;
     const vel_with_delta = player.velocity.mult(new exports.Vector(ticks, ticks));
 
@@ -307,8 +319,12 @@
       this.power_up_slot = null;
       this.current_power_up = null;
       this.power_up_time_left = 0;
+      this.selected_slot = 0;
       this.weapons = [{
           ammo: 2,
+          cli_internal: {
+            back_anim: 0
+          },
           conf: {
             additional_ground_ammo: 0,
             additional_barrels: 0,
@@ -318,11 +334,17 @@
             additional_efficiency: 0,
             suck_mode: 0,
             bullet_gravity: 0,
-            scope: 0
+            scope: 0,
+            lingering_trails: 0,
+            trail_color: 0,
+            teleportation: 0
           }
         },
         {
           ammo: 2,
+          cli_internal: {
+            back_anim: 0
+          },
           conf: {
             additional_ground_ammo: 0,
             additional_barrels: 0,
@@ -331,11 +353,17 @@
             additional_launching_power: 0,
             bullet_gravity: 0,
             suck_mode: 0,
-            scope: 0
+            scope: 0,
+            lingering_trails: 0,
+            trail_color: 0,
+            teleportation: 0
           }
         },
         {
           ammo: 2,
+          cli_internal: {
+            back_anim: 0
+          },
           conf: {
             additional_ground_ammo: 0,
             additional_barrels: 0,
@@ -344,7 +372,10 @@
             additional_launching_power: 0,
             bullet_gravity: 0,
             suck_mode: 0,
-            scope: 0
+            scope: 0,
+            lingering_trails: 0,
+            trail_color: 0,
+            teleportation: 0
           }
         }
       ]
@@ -372,8 +403,8 @@
     {
       key: "additional_size",
       name: "Bigger bullet size",
-      maxval: 4,
-      cost: 5
+      maxval: 5,
+      cost: 3
     },
     {
       key: "additional_barrels",
@@ -398,6 +429,24 @@
       name: "Scope",
       maxval: 5,
       cost: 3
+    },
+    {
+      key: "lingering_trails",
+      name: "Bullet Distractions",
+      maxval: 5,
+      cost: 6
+    },
+    {
+      key: "trail_color",
+      name: "Trail Color",
+      maxval: 10,
+      cost: 0
+    },
+    {
+      key: "teleportation",
+      name: "Teleportation",
+      maxval: 4,
+      cost: 6
     }
   ]
 
@@ -406,11 +455,11 @@
   }
 
   exports.LerpNum = class LerpNum {
-    constructor(start_val, end_val, time) {
+    constructor(start_val, end_val, time, start_in) {
       this.start_val = start_val;
       this.end_val = end_val;
 
-      this.start_time = Date.now();
+      this.start_time = Date.now() + (start_in || 0);
       this.duration = time;
     }
 
@@ -421,6 +470,10 @@
 
       if (this.duration === 0) {
         return this.end_val;
+      }
+
+      if (Date.now() < this.start_time) {
+        return this.start_val;
       }
 
       return ((this.end_val - this.start_val) / this.duration) * limit(Date.now() - this.start_time, this.duration) + this.start_val;
@@ -444,7 +497,7 @@
   exports.torad = function(deg) {
     return deg / (Math.PI / 180);
   }
-  
+
   exports.todeg = function(rad) {
     return rad * 180 / Math.PI;
   }
@@ -475,12 +528,12 @@
       duration: 30,
       rand_repeat: 3
     },*/
-    launch: {
+    /*launch: {
       name: "Launch!",
       bg_color: "orange",
       duration: 0,
       rand_repeat: 3
-    },
+    },*/
     instant_heal: {
       name: "Instant heal",
       bg_color: "red",
@@ -499,45 +552,73 @@
       bg_color: "brown",
       duration: 15,
       rand_repeat: 1
+    },
+    flashy_bullets: {
+      name: "Extra Flash",
+      bg_color: "#fff",
+      duration: 7,
+      rand_repeat: 2
     }
   }
-  
+
   // @TODO CLEARLY CLIENT PLZ MOVE BEFORE WORLD EXPLODES
   exports.hslToRgb = function(h, s, l) {
     var r, g, b;
 
-    if(s === 0){
-        r = g = b = l; // achromatic
-    }else{
-        var hue2rgb = function hue2rgb(p, q, t){
-            if(t < 0) t += 1;
-            if(t > 1) t -= 1;
-            if(t < 1/6) return p + (q - p) * 6 * t;
-            if(t < 1/2) return q;
-            if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-            return p;
-        }
+    if (s === 0) {
+      r = g = b = l; // achromatic
+    } else {
+      var hue2rgb = function hue2rgb(p, q, t) {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+      }
 
-        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        var p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
+      var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      var p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1 / 3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1 / 3);
     }
 
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
+  }
   
-  exports.apply_gun_forces = function(player, gun_dir_vec, weapon) {
-    const is_grounded = exports.is_on_ground(player.position);
-    
-    player.velocity = gun_dir_vec.mult(
-          new exports.Vector(is_grounded ? 40 : 30, is_grounded ? 40 : 30).add(new exports.Vector(weapon.conf.additional_launching_power * 3, weapon.conf.additional_launching_power * 3))
-        ).negate();
+  exports.get_teleportation_vec = function(dir, level) {
+    return dir.mult(new exports.Vector(level * 100, level * 100));
+  }
+  
+  exports.get_teleportation_punish = function(level) {
+    return level * 2;
+  }
 
-        if (weapon.conf.suck_mode) {
-          player.velocity.mutnegate();
-        }
+  exports.apply_gun_forces = function(player, gun_dir_vec, weapon, optional_client) {
+    const is_grounded = exports.is_on_ground(player.position);
+    const tpvec = exports.get_teleportation_vec(gun_dir_vec, weapon.conf.teleportation);
+    
+    if (exports.canMoveInDir(player.position, tpvec)) {
+      player.position.mutadd(tpvec);
+    } else {
+      if (optional_client) {
+        optional_client.add_message([
+          {
+            "color": "red",
+            "text": "Teleport failed ~ Teleported in wall! Took " + exports.get_teleportation_punish(weapon.conf.teleportation) + " damage"
+          }
+        ]);
+      }
+    }
+
+    player.velocity = gun_dir_vec.mult(
+      new exports.Vector(is_grounded ? 40 : 30, is_grounded ? 40 : 30).add(new exports.Vector(weapon.conf.additional_launching_power * 1.5, weapon.conf.additional_launching_power * 1.5)).sub(new exports.Vector(weapon.conf.teleportation * 15, weapon.conf.teleportation * 15))
+    ).negate();
+
+    if (weapon.conf.suck_mode) {
+      player.velocity.mutnegate();
+    }
   }
 
   exports.world = {};

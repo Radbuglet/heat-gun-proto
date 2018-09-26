@@ -215,7 +215,7 @@
             obj.x + obj.w, obj.y + obj.h,
             depth);
         }
-      }); 
+      });
     }
 
     const renderLayer = (layer_name) => {
@@ -262,6 +262,10 @@
           }
           
           const draw = () => {
+            if (obj.bullet_phased) {
+                ctx.globalAlpha = 0.75;
+                //ctx.globalCompositeOperation = "lighten";
+            }
             ctx.fillStyle = obj.color;
             
             if (layer_name === "bg") {
