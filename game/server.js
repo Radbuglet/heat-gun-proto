@@ -192,6 +192,12 @@ socket.on('connection', client => {
       console.log("A socket is playing with name " + username + " (INVALID)");
     }
   });
+  
+  client.on("svping", clts => {
+    if (typeof clts === typeof 1) {
+      socket.emit("svpong", clts);
+    }
+  });
 
   client.on("gun", data => {
     if (typeof data !== typeof {}) return
@@ -204,7 +210,7 @@ socket.on('connection', client => {
       if (typeof data.selected_weapon !== typeof 1 || data.selected_weapon > user.player.weapons.length) {
         return;
       }
-      
+
       if (data.selected_weapon !== user.player.selected_slot) {
         user.player.selected_slot = data.selected_weapon;
       }
@@ -213,7 +219,7 @@ socket.on('connection', client => {
       const weapon = user.player.weapons[data.selected_weapon];
       if (weapon.ammo <= 0) return;
       weapon.ammo--;
-      
+
       let has_set_vel = false;
       for (let bc_itt = 0; bc_itt < (weapon.conf.additional_barrels + 1); bc_itt++) {
         if (!has_set_vel) {
@@ -221,11 +227,10 @@ socket.on('connection', client => {
           has_set_vel = true;
         }
 
-        const dir_rad_innac = (Math.random() - 0.75) * ((weapon.conf.additional_barrels + weapon.conf.additional_size * 0.1) / 5);
+        const dir_rad_innac = (Math.random() - 0.75) * ((weapon.conf.additional_barrels + weapon.conf.additional_size * 0.025) / 5);
         const vec = new common.Vector(Math.sin(dir + dir_rad_innac), Math.cos(dir + dir_rad_innac));
-        
+
         if (!common.canMoveInDir(user.player.position, common.get_teleportation_vec(vec, weapon.conf.teleportation))) {
-          user.damage_player(common.get_teleportation_punish(weapon.conf.teleportation));
           return;
         }
 
@@ -248,7 +253,7 @@ socket.on('connection', client => {
                   ouser.player.position.getX(), ouser.player.position.getY(),
                   common.conf.player_size, common.conf.player_size
                 )) {
-                let damage = Math.max(2 + (weapon.conf.additional_callibur * 2) + (weapon.conf.additional_barrels * 7), 3) / (weapon.conf.additional_barrels + 1);
+                let damage = Math.max(4 + (weapon.conf.additional_callibur * 1.5) + (weapon.conf.additional_barrels * 7), 3) / (weapon.conf.additional_barrels + 1) * common.get_firerate_multiplier(weapon.conf.fire_rate);
                 if (ouser.player.health - damage <= 0) {
                   broadcast_message([{
                       color: "darkred",
@@ -263,6 +268,23 @@ socket.on('connection', client => {
 
                 let gained_energy = damage / 4;
 
+                ouser.sendMessage([{
+                    color: "red",
+                    text: user.player.name
+                  }, {
+                    color: "darkred",
+                    text: " did "
+                  },
+                  {
+                    color: "red",
+                    text: Math.floor(damage * 10) / 10
+                  },
+                  {
+                    color: "darkred",
+                    text: " damage to you!"
+                  }
+                ]);
+
                 user.player.energy += gained_energy;
                 user.player.total_energy += gained_energy;
                 user.sendMessage([{
@@ -271,7 +293,7 @@ socket.on('connection', client => {
                   },
                   {
                     color: "green",
-                    text: Math.floor(gained_energy)
+                    text: Math.floor(gained_energy * 10) / 10
                   },
                   {
                     color: "darkgreen",
@@ -279,7 +301,7 @@ socket.on('connection', client => {
                   },
                   {
                     color: "red",
-                    text: " Damage dealt: " +  damage
+                    text: " Damage dealt: " + Math.floor(damage * 10) / 10
                   }
                 ]);
 
@@ -315,11 +337,31 @@ socket.on('connection', client => {
         ray.world_collidable = user.player.current_power_up !== "faze_bullet";
 
         ray.trace();
+
+        if (ray.last_collided_object !== null && ray.last_collided_object.toggleable && user.player.lowered_phys) {
+          // @TODO test player collisions
+          let can_do_it = true;
+          for (let sock_uuid in players) {
+            let ouser = players[sock_uuid];
+            if (ouser !== null && ouser.isPlaying()) {
+              if (common.testrectcollision(ouser.player.position.getX(), ouser.player.position.getY(), common.conf.player_size, common.conf.player_size, ray.last_collided_object.x, ray.last_collided_object.y, ray.last_collided_object.w, ray.last_collided_object.h)) {
+                can_do_it = false;
+                break;
+              }
+
+            }
+          }
+
+          if (can_do_it) {
+            common.disable_collision_indices[ray.last_collided_object.collision_world_index] = common.disable_collision_indices[ray.last_collided_object.collision_world_index] !== true ? true : false;
+          }
+        }
         ray_list.push(ray);
       }
 
       socket.emit("add_beams", ray_list.map((ray) => {
         return {
+          instigator: user.pub_uuid,
           beam_path: ray.path.map(p => {
             return {
               pX: p.getX(),
@@ -336,13 +378,13 @@ socket.on('connection', client => {
       broadcast_state();
     }
   });
-  
+
   client.on("slot_change", i => {
-        if (user.isPlaying()) {
+    if (user.isPlaying()) {
       if (typeof i !== typeof 1 || i > user.player.weapons.length) {
         return;
       }
-      
+
       if (i !== user.player.selected_slot) {
         user.player.selected_slot = i;
       }
@@ -388,7 +430,7 @@ socket.on('connection', client => {
       user.player.power_up_slot = null;
 
       if (user.player.current_power_up === "instant_heal") {
-        user.player.health = 20;
+        user.player.health = 25;
       } else if (user.player.current_power_up === "launch") {
         user.player.velocity.setY(-100);
         user.player.can_use_rush = true;
@@ -455,6 +497,8 @@ socket.on('connection', client => {
 
 let last_update = Date.now();
 let total_update_ticks = 0;
+let frames_counter = 0;
+let last_second = Date.now();
 
 function broadcast_message(msg) {
   for (let socket_uuid in players) {
@@ -468,6 +512,14 @@ function broadcast_message(msg) {
 setInterval(_ => {
   let dt = Date.now() - last_update;
   let ticks_passed = dt / ((1 / 60) * 1000);
+
+  frames_counter += 1;
+
+  if (last_second + 1000 < Date.now()) {
+    last_second = Date.now();
+    console.log("FPS: " + frames_counter);
+    frames_counter = 0;
+  }
 
   for (let socket_uuid in players) {
     const user = players[socket_uuid];
@@ -488,8 +540,8 @@ setInterval(_ => {
           }
         });
       }
-      
-      if (total_update_ticks % 100 === 0 && user.player.health < 20) {
+
+      if (total_update_ticks % 100 === 0 && user.player.health < 25) {
         user.player.health += 1;
       }
 
@@ -497,16 +549,9 @@ setInterval(_ => {
         let changed = false;
 
         user.player.weapons.forEach(weapon => {
-          if (weapon.ammo < 2) {
-            weapon.ammo = 2;
+          if (weapon.ammo < weapon.conf.additional_ground_ammo + 2) {
+            weapon.ammo = weapon.conf.additional_ground_ammo + 2;
             changed = true;
-            user.last_fuel_ammo_time = Date.now();
-          }
-
-          if (weapon.ammo < weapon.conf.additional_ground_ammo + 2 && user.last_fuel_ammo_time + 255 < Date.now()) {
-            weapon.ammo++;
-            changed = true;
-            user.last_fuel_ammo_time = Date.now();
           }
         });
         if (changed) {
@@ -536,7 +581,7 @@ setInterval(_ => {
         user.player.velocity.setY(-20);
         user.player.can_use_rush = true;
         user.player.weapons.forEach(function(weapon) {
-          weapon.ammo = 2;
+          weapon.ammo = weapon.conf.additional_ground_ammo + 2;
         });
         // @TODO
         /*user.damage_player(1, [{
@@ -590,6 +635,7 @@ function broadcast_state(single_user_only, user_added_data, global_added_data) {
     svr_timestamp: common.get_net_ts(),
     glob_add: global_added_data,
     player_data: [],
+    disable_collision_indices: common.disable_collision_indices,
     x: bsc
   }
 

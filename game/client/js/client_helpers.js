@@ -1,25 +1,25 @@
 (function(exports) {
-  exports.draw_player = function(ctx, player, is_other_player) {
-    const render_position = player.client_interp_position;
+  exports.draw_player = function(ctx, player, is_other_player, override_position) {
+    const render_position = override_position || player.client_interp_position;
 
-    render_position.mutadd(player.position.sub(render_position).normalized().mult(new rebound_common.Vector(
-      0.5 * render_position.distance(player.position),
-      0.5 * render_position.distance(player.position)
+    player.client_interp_position.mutadd(player.position.sub(player.client_interp_position).normalized().mult(new rebound_common.Vector(
+      0.5 * player.client_interp_position.distance(player.position),
+      0.5 * player.client_interp_position.distance(player.position)
     )));
 
     ctx.save();
     if (player.current_power_up === "invisibility") {
       ctx.globalAlpha = 0.025;
     }
-    
+
     let is_inside_any_object = false;
-    
+
     rebound_common.world.tiles.forEach(tile => {
       if (tile.layer !== "bg" && rebound_common.testrectcollision(render_position.getX(), render_position.getY(), rebound_common.conf.player_size, rebound_common.conf.player_size, tile.x, tile.y, tile.w, tile.h)) {
         is_inside_any_object = true;
       }
     })
-    
+
     if (is_inside_any_object) {
       ctx.globalCompositeOperation = "darken";
     }
@@ -43,8 +43,8 @@
       ctx.save();
       ctx.font = "12px monospace";
       ctx.strokeStyle = "#fff";
-      ctx.strokeText(player.health + " / 20", render_position.getX() - rebound_common.conf.player_size / 2, render_position.getY() - 40);
-      ctx.fillText(player.health + " / 20", render_position.getX() - rebound_common.conf.player_size / 2, render_position.getY() - 40);
+      ctx.strokeText((Math.floor(player.health * 10) / 10) + " / 25", render_position.getX() - rebound_common.conf.player_size / 2, render_position.getY() - 40);
+      ctx.fillText((Math.floor(player.health * 10) / 10) + " / 25", render_position.getX() - rebound_common.conf.player_size / 2, render_position.getY() - 40);
       ctx.restore();
     }
 
@@ -150,7 +150,7 @@
 
     attach(ctx, w, h) {
       ctx.save();
-      ctx.translate(w/2, h/2);
+      ctx.translate(w / 2, h / 2);
       ctx.scale(this.zoom, this.zoom);
       ctx.translate(-Math.floor(this.lookvec.getX()), -Math.floor(this.lookvec.getY()));
     }
@@ -176,7 +176,12 @@
     const min = cam.toWorldPos(new rebound_common.Vector(0, 0), w, h);
     const max = cam.toWorldPos(new rebound_common.Vector(w, h), w, h);
 
-    return world.tiles.map((obj, i) => {return {obj, i}}).filter(obj => {
+    return world.tiles.map((obj, i) => {
+      return {
+        obj,
+        i
+      }
+    }).filter(obj => {
       obj = obj.obj;
       const bound = 350;
       if (obj.x + obj.w + bound < min.getX() || obj.x - bound > max.getX() || obj.y + obj.h + bound < min.getY() || obj.y - bound > max.getY()) {
@@ -205,7 +210,7 @@
             obj.x, obj.y + obj.h,
             obj.x + obj.w, obj.y + obj.h,
             depth);
-  
+
           renderer_3d.addFace("blue",
             obj.x, obj.y,
             obj.x, obj.y + obj.h,
@@ -227,53 +232,55 @@
         if (obj.layer === layer_name) {
           // Obj
           ctx.save();
-          
+
           const draw_one_way_arrow = () => {
             if (typeof obj.one_way !== typeof 1) return;
             const axis = obj.one_way < 2 ? "x" : "y";
             const positive = obj.one_way % 2 !== 0;
-            
+
             const cx = obj.x + obj.w / 2;
             const cy = obj.y + obj.h / 2;
-            
+
             ctx.save();
             ctx.translate(Math.floor(cx), Math.floor(cy));
             ctx.scale(0.5, 0.5);
             ctx.setLineDash([5, 5]);
-            
+
             ctx.strokeStyle = "red";
             ctx.lineWidth = 10;
             if (axis === "y") {
               ctx.beginPath();
-              ctx.moveTo(- obj.w / 2, ((obj.h / 2) * (positive ? -1 : 1)));
+              ctx.moveTo(-obj.w / 2, ((obj.h / 2) * (positive ? -1 : 1)));
               ctx.lineTo(0, 0);
               ctx.lineTo(obj.w / 2, ((obj.h / 2) * (positive ? -1 : 1)));
             } else {
               ctx.beginPath();
-              ctx.moveTo(((obj.w / 2) * (positive ? -1 : 1)), - obj.h / 2);
+              ctx.moveTo(((obj.w / 2) * (positive ? -1 : 1)), -obj.h / 2);
               ctx.lineTo(0, 0);
               ctx.lineTo(((obj.w / 2) * (positive ? -1 : 1)), obj.h / 2);
             }
-            
+
             ctx.stroke();
             ctx.closePath();
-            
+
             ctx.restore();
           }
-          
+
           const draw = () => {
             if (obj.bullet_phased) {
-                ctx.globalAlpha = 0.75;
-                //ctx.globalCompositeOperation = "lighten";
+              ctx.globalAlpha = 0.75;
+              //ctx.globalCompositeOperation = "lighten";
             }
+
             ctx.fillStyle = obj.color;
-            
+
             if (layer_name === "bg") {
               ctx.beginPath();
               const vertices = [exports.PP3Dmagic(obj.x, obj.y, center, 0.25),
-                                exports.PP3Dmagic(obj.x + obj.w, obj.y, center, 0.25),
-                                exports.PP3Dmagic(obj.x + obj.w, obj.y + obj.h, center, 0.25),
-                               exports.PP3Dmagic(obj.x, obj.y + obj.h, center, 0.25)];
+                exports.PP3Dmagic(obj.x + obj.w, obj.y, center, 0.25),
+                exports.PP3Dmagic(obj.x + obj.w, obj.y + obj.h, center, 0.25),
+                exports.PP3Dmagic(obj.x, obj.y + obj.h, center, 0.25)
+              ];
               vertices.forEach((vec_p, index) => {
                 if (index === 0) {
                   ctx.moveTo(vec_p.getX(), vec_p.getY());
@@ -281,27 +288,43 @@
                   ctx.lineTo(vec_p.getX(), vec_p.getY());
                 }
               });
-              
-              ctx.stroke();
+
               ctx.fill();
+              ctx.stroke();
             } else {
-              ctx.fillRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
-              
+              if (rebound_common.disable_collision_indices[i] !== true) {
+                ctx.fillRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
+              }
+
+              if (obj.toggleable) {
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = ctx.fillStyle;
+                ctx.lineWidth = 5;
+                ctx.strokeRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
+
+                if (rebound_common.disable_collision_indices[i] === true) {
+                  ctx.beginPath();
+                  ctx.arc(obj.x + obj.w / 2, obj.y + obj.h / 2, 20, 0, 2 * Math.PI);
+                  ctx.stroke();
+                  ctx.closePath();
+                }
+              }
+
               if (layer_name === "dec") {
                 ctx.fillStyle = `rgba(255, 255, 255, ${Math.sin(Date.now() / 100) * 0.05 + 0})`
                 ctx.fillRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
               }
             }
-            
+
             draw_one_way_arrow();
           }
-          
+
           if (typeof custom_block_code === "function") {
             custom_block_code(obj, draw, i);
           } else {
             draw();
           }
-          
+
           ctx.restore();
         }
       });
@@ -312,7 +335,7 @@
     renderLayer("obj"); // Object
     renderLayer("dec"); // Decor
   }
-  
+
   exports.draw_crystals = function(ctx, power_up_crystal_data, total_frames) {
     rebound_common.world.power_up_boxes.forEach(function(box, i) {
       if (i < power_up_crystal_data.length) { // Used to ensure that the  data exists for each power up box
@@ -431,16 +454,16 @@
         const other_player = client.other_players[other_player_uuid];
 
         if ((other_player.position.getX() < client.player.position.getX() && look_lt) || (
-          other_player.position.getX() > client.player.position.getX() && !look_lt
-        )) {
+            other_player.position.getX() > client.player.position.getX() && !look_lt
+          )) {
           const player_dist = Math.abs(other_player.position.getX() - client.player.position.getX());
           const axis_dist = Math.abs(other_player.position.getY() - client.camera.toWorldPos(line_pos, client.getWidth(), client.getHeight()).getY());
           rheight += Math.max(
             (-Math.pow(axis_dist / 100, 2) + 40) + (-Math.pow(player_dist / 400, 2) + 50),
-          0);
+            0);
 
           if (axis_dist < min_axis_dist) min_axis_dist = axis_dist;
-          if (player_dist < min_player_dist) min_player_dist = player_dist; 
+          if (player_dist < min_player_dist) min_player_dist = player_dist;
         }
       }
 
@@ -469,7 +492,7 @@
       });
 
       let cx = !no_center ? x - cw / 2 : x;
-      
+
       function resolve_color(col) {
         if (col === "THEME_IMPORTANT") {
           return `hsl(${Date.now() / 20}deg, 100%, 75%)`
@@ -482,21 +505,21 @@
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.font = font_style;
-        
+
         const selection_rect_pos = [cx, cy];
         const selection_rect_size = [ctx.measureText(component.text).width, calculated_line_height];
-        
+
         const is_hovered = rebound_common.testrectcollision(selection_rect_pos[0], selection_rect_pos[1], selection_rect_size[0], selection_rect_size[1], client.mouse_pos.getX(), client.mouse_pos.getY(), 1, 1);
-        
+
         if (typeof component.click_action === "function" || typeof component.click_action === "string") {
           ctx.fillStyle = resolve_color(component.click_underline);
           ctx.fillRect(cx, cy + calculated_line_height + (is_hovered ? 5 : 0), ctx.measureText(component.text).width, 5);
-          
+
           if (is_hovered) {
             client.pointer_mode = "pointer";
             if (client.mousedown_frame) {
               if (typeof component.click_action === "string") {
-                open(component.click_action); 
+                open(component.click_action);
               } else {
                 component.click_action();
               }
@@ -508,7 +531,7 @@
           ctx.fillStyle = resolve_color(component.bg);
           ctx.fillRect(selection_rect_pos[0], selection_rect_pos[1], selection_rect_size[0], selection_rect_size[1]);
         }
-        
+
         ctx.fillStyle = resolve_color(component.color);
         ctx.strokeStyle = component.color;
 
@@ -599,11 +622,11 @@
       if (e.button === 0) {
         this.mousedown = false;
       }
-      
+
       if (e.button === 2) {
         this.rmousedown = false;
       }
-      
+
       this.app_mouseup(e);
     }
 
@@ -612,28 +635,28 @@
         this.mousedown = true;
         this.mousedown_frame = true;
       }
-      
+
       if (e.button === 2) {
         this.rmousedown = true;
       }
-      
+
       this.app_mousedown(e);
     }
-    
+
     app_keydown() {
-      
+
     }
-    
+
     app_keyup() {
-      
+
     }
-    
+
     app_mousedown() {
-      
+
     }
-    
+
     app_mouseup() {
-      
+
     }
 
     tick() {
@@ -650,19 +673,19 @@
       }
 
       this.total_frames += 1;
-      
+
       this.pointer_mode = "default";
-      
+
       this.update(dt, ticks_passed);
       this.render(this.ctx, this.getWidth(), this.getHeight());
-      
+
       if (this.pointer_mode !== this.canvas.style.cursor) {
         this.canvas.style.cursor = this.pointer_mode;
       }
-      
+
       this.last_tick = Date.now();
       this.last_open_play_dialog = 0;
-      
+
       this.mousedown_frame = false;
     }
 
@@ -676,14 +699,14 @@
   }
 
   // 3D
-  
+
   exports.PP3Dmagic = function(px, py, center, depth) {
-        return new rebound_common.Vector(px, py).add(
-          new rebound_common.Vector(
-            Math.floor(center.getX() - px),
-            Math.floor(center.getY() - py)
-        ).mult(new rebound_common.Vector(depth || 0.25, depth || 0.25)).floor()
-      );
+    return new rebound_common.Vector(px, py).add(
+      new rebound_common.Vector(
+        Math.floor(center.getX() - px),
+        Math.floor(center.getY() - py)
+      ).mult(new rebound_common.Vector(depth || 0.25, depth || 0.25)).floor()
+    );
   }
 
   exports.PointPerspective3DRenderer = class {

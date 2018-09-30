@@ -197,6 +197,11 @@
           const obj = this.world.tiles[this.selected_object_index];
           obj.reflective = !obj.reflective;
         }
+        
+        if (e.keyCode === 72) {
+          const obj = this.world.tiles[this.selected_object_index];
+          obj.toggleable = !obj.toggleable;
+        }
 
         if (e.keyCode === 79) {
           const obj = this.world.tiles[this.selected_object_index];
@@ -470,7 +475,7 @@
         ctx.globalCompositeOperation = "xor";
         ctx.textAlign = "left";
 
-        ctx.fillText("Move Collisions: " + this.opt_move_collisions + " [Toggle using C] || Grid: " + this.opt_move_grid + " || Zoom: " + Math.floor(this.camera.zoom * 100) / 100, 20, h - 20);
+        ctx.fillText("Move Collisions: " + this.opt_move_collisions + " [Toggle using C] || Grid: " + this.opt_move_grid + " || Zoom: " + Math.floor(this.camera.zoom * 100) / 100 + "              || OBJS: " + rebound_helpers.get_culled(this.camera, w, h, rebound_common.world).length, 20, h - 20);
         
         let active_block = this.get_active_block();
         if (active_block !== null) {

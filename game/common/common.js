@@ -131,6 +131,10 @@
     getdeg() {
       return exports.todeg(Math.atan2(this.getX(), this.getY()));
     }
+    
+    getrad() {
+      return Math.atan2(this.getX(), this.getY());
+    }
   }
 
   exports.testrectcollision = function(x1, y1, w1, h1, x2, y2, w2, h2) {
@@ -143,9 +147,18 @@
   exports.is_colliding_with_obj = function(pos, size, return_actual_object, return_list_mode) {
     let cobj = null;
     let cobjs = [];
-    exports.world.tiles.forEach(obj => {
+    exports.world.tiles.forEach((obj, i) => {
       if (obj.layer === "obj") {
-        if (exports.testrectcollision(obj.x, obj.y, obj.w, obj.h, pos.getX(), pos.getY(), size.getX(), size.getY())) {
+        if (exports.disable_collision_indices[i] === true) {
+          if (new exports.Vector(obj.x + obj.w / 2, obj.y + obj.h / 2).distance(pos) < 30) {
+            obj.collision_world_index = i;
+            cobj = obj;
+            cobjs.push(obj);
+          }
+        }
+        
+        if (exports.disable_collision_indices[i] !== true && exports.testrectcollision(obj.x, obj.y, obj.w, obj.h, pos.getX(), pos.getY(), size.getX(), size.getY())) {
+          obj.collision_world_index = i;
           cobj = obj;
           cobjs.push(obj);
         }
@@ -198,6 +211,7 @@
       this.max_dist = 8;
       this.world_collidable = true;
       this.size = 1;
+      this.last_collided_object = null;
 
       this.gravity = 0;
 
@@ -224,6 +238,8 @@
         let should_check = step % this.chkstep === 0;
         if (should_check ? this.extra_check() : true) {
           let collided_with = should_check ? exports.canMoveInDirROBJ(this.pos.sub(pos_sub), this.direction, size_vec) : null;
+          
+          this.last_collided_object = collided_with;
           
           if (collided_with === null || !this.world_collidable || collided_with.bullet_phased) {
             this.pos.mutadd(this.direction.normalized());
@@ -310,9 +326,9 @@
       this.client_interp_position = new exports.Vector(10, 10);
       this.velocity = new exports.Vector(0, 0);
       this.action_ack_id = null;
-      this.health = 20;
-      this.energy = 14;
-      this.total_energy = 14;
+      this.health = 25;
+      this.energy = 18;
+      this.total_energy = 18;
       this.can_use_rush = true;
       this.name = name;
       this.lowered_phys = false;
@@ -337,7 +353,8 @@
             scope: 0,
             lingering_trails: 0,
             trail_color: 0,
-            teleportation: 0
+            teleportation: 0,
+            fire_rate: 0
           }
         },
         {
@@ -356,7 +373,8 @@
             scope: 0,
             lingering_trails: 0,
             trail_color: 0,
-            teleportation: 0
+            teleportation: 0,
+            fire_rate: 0
           }
         },
         {
@@ -375,7 +393,8 @@
             scope: 0,
             lingering_trails: 0,
             trail_color: 0,
-            teleportation: 0
+            teleportation: 0,
+            fire_rate: 0
           }
         }
       ]
@@ -389,22 +408,16 @@
       cost: 3
     },
     {
-      key: "additional_launching_power",
-      name: "Additional proppelling",
-      maxval: 5,
-      cost: 3
-    },
-    {
       key: "additional_callibur",
       name: "Additional callibur",
       maxval: 6,
       cost: 4
     },
     {
-      key: "additional_size",
-      name: "Bigger bullet size",
-      maxval: 5,
-      cost: 3
+      key: "fire_rate",
+      name: "Faster Fire",
+      maxval: 4,
+      cost: 4,
     },
     {
       key: "additional_barrels",
@@ -413,22 +426,34 @@
       cost: 7
     },
     {
-      key: "bullet_gravity",
-      name: "Bullet Gravity",
-      maxval: 4,
-      cost: 3
-    },
-    {
       key: "suck_mode",
       name: "Suck Mode",
       maxval: 1,
       cost: 10
     },
     {
-      key: "scope",
-      name: "Scope",
+      key: "additional_size",
+      name: "Bigger bullet size",
       maxval: 5,
       cost: 3
+    },
+    {
+      key: "additional_launching_power",
+      name: "Additional proppelling",
+      maxval: 5,
+      cost: 3
+    },
+    {
+      key: "bullet_gravity",
+      name: "Bullet Gravity",
+      maxval: 4,
+      cost: 3
+    },
+    {
+      key: "scope",
+      name: "Scope",
+      maxval: 7,
+      cost: 2
     },
     {
       key: "lingering_trails",
@@ -446,8 +471,8 @@
       key: "teleportation",
       name: "Teleportation",
       maxval: 4,
-      cost: 6
-    }
+      cost: 4
+    },
   ]
 
   exports.round = function(x, n) {
@@ -495,7 +520,7 @@
   }
 
   exports.torad = function(deg) {
-    return deg / (Math.PI / 180);
+    return deg * (Math.PI / 180);
   }
 
   exports.todeg = function(rad) {
@@ -601,15 +626,6 @@
     
     if (exports.canMoveInDir(player.position, tpvec)) {
       player.position.mutadd(tpvec);
-    } else {
-      if (optional_client) {
-        optional_client.add_message([
-          {
-            "color": "red",
-            "text": "Teleport failed ~ Teleported in wall! Took " + exports.get_teleportation_punish(weapon.conf.teleportation) + " damage"
-          }
-        ]);
-      }
     }
 
     player.velocity = gun_dir_vec.mult(
@@ -619,6 +635,10 @@
     if (weapon.conf.suck_mode) {
       player.velocity.mutnegate();
     }
+  }
+  
+  exports.get_firerate_multiplier = function(level) {
+    return 1 - (0.15 * level);
   }
 
   exports.world = {};
@@ -633,6 +653,8 @@
     exports.conf = conf_jsn.conf;
     exports.world = conf_jsn.map_data;
   }
+  
+  exports.disable_collision_indices = {} // (HashMap<index : int, garbage_data : bool>)
 }(
   typeof module === "object" && typeof module.exports === "object" ? module.exports : window.rebound_common = {}
 ));
