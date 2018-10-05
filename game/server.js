@@ -171,7 +171,9 @@ socket.on('connection', client => {
       }
       user.player.position = spawn_loc;
 
-      broadcast_state();
+      broadcast_state(null, undefined, {
+        onlyupdatepos: [user.pub_uuid]
+      });
 
       broadcast_message([{
           color: "#ee1a1a",
@@ -192,7 +194,7 @@ socket.on('connection', client => {
       console.log("A socket is playing with name " + username + " (INVALID)");
     }
   });
-  
+
   client.on("svping", clts => {
     if (typeof clts === typeof 1) {
       socket.emit("svpong", clts);
@@ -218,14 +220,12 @@ socket.on('connection', client => {
       const ray_list = [];
       const weapon = user.player.weapons[data.selected_weapon];
       if (weapon.ammo <= 0) return;
+      const hit_users = [];
       weapon.ammo--;
 
-      let has_set_vel = false;
+      common.apply_gun_forces(user.player, new common.Vector(Math.sin(dir), Math.cos(dir)), weapon);
+
       for (let bc_itt = 0; bc_itt < (weapon.conf.additional_barrels + 1); bc_itt++) {
-        if (!has_set_vel) {
-          common.apply_gun_forces(user.player, new common.Vector(Math.sin(dir), Math.cos(dir)), weapon);
-          has_set_vel = true;
-        }
 
         const dir_rad_innac = (Math.random() - 0.75) * ((weapon.conf.additional_barrels + weapon.conf.additional_size * 0.025) / 5);
         const vec = new common.Vector(Math.sin(dir + dir_rad_innac), Math.cos(dir + dir_rad_innac));
@@ -305,7 +305,9 @@ socket.on('connection', client => {
                   }
                 ]);
 
-                ouser.player.velocity = new common.Vector(0, weapon.conf.lingering_trails > 0 ? -2 : -20).add(ray.direction.mult(new common.Vector(weapon.conf.lingering_trails > 0 ? 5 : 25, weapon.conf.lingering_trails > 0 ? 5 : 25)));
+                ouser.player.velocity = new common.Vector(0, weapon.conf.lingering_trails > 0 ? -2 : -20).add(ray.direction.mult(new common.Vector(weapon.conf.lingering_trails > 0 ? 5 : 25, weapon.conf.lingering_trails > 0 ? 5 : 25))
+                  .mult(new common.Vector(common.get_firerate_multiplier(weapon.conf.fire_rate), common.get_firerate_multiplier(weapon.conf.fire_rate))));
+                hit_users.push(ouser.pub_uuid);
                 ouser.damage_player(damage, [
                   [{
                       color: "darkgray",
@@ -375,7 +377,9 @@ socket.on('connection', client => {
       }));
 
       user.player.action_ack_id = data.action_ack_id;
-      broadcast_state();
+      // If you're wondering what will happen to the players that get damaged, they still will be damaged
+      // because my netcode is bad and damage to players will broadcast anyway.
+      broadcast_state_positions();
     }
   });
 
@@ -410,7 +414,7 @@ socket.on('connection', client => {
           }
 
           user.player.action_ack_id = ackid;
-          broadcast_state();
+          broadcast_state_positions();
         }
       }
     }
@@ -419,7 +423,7 @@ socket.on('connection', client => {
   client.on("set_lowered_phys", b => {
     if (user.isPlaying() && typeof b === typeof true) {
       user.player.lowered_phys = b;
-      broadcast_state();
+      broadcast_state_positions();
     }
   });
 
@@ -625,10 +629,34 @@ setInterval(_ => {
 }, 1000);
 
 setInterval(_ => {
-  broadcast_state();
+  broadcast_state(null, undefined);
 }, 500);
 
 let bsc = 0;
+
+function broadcast_state_positions() {
+  let packet = {};
+  
+  for (let sock_uuid in players) {
+    let user = players[sock_uuid];
+    if (user !== null && user.isPlaying()) {
+      packet[user.pub_uuid] = [
+        user.player.position.getX(),
+        user.player.position.getY(),
+        user.player.velocity.getX(),
+        user.player.velocity.getY(),
+        user.player.lowered_phys
+      ];
+    }
+  }
+  
+  for (let sock_uuid in players) {
+    let user = players[sock_uuid];
+    if (user !== null && user.isPlaying()) {
+      user.client.emit("heartbeat-slim", packet);
+    }
+  }
+}
 
 function broadcast_state(single_user_only, user_added_data, global_added_data) {
   let update_data = {

@@ -11,7 +11,7 @@
       this.last_ping = -719;
       this.ping_avg_sum = 0;
       this.ping_avg_counter = 0;
-      
+
       this.visfov = 180;
       this.latest_heartbeat_packet = 0;
       this.last_heartbeat_time = Date.now();
@@ -59,16 +59,16 @@
 
         this.canvas.style.animation = 'spawn 0.25s';
       });
-      
+
       setInterval(() => {
         socket.emit("svping", Date.now());
       }, 500);
-      
+
       socket.on("svpong", clts => {
         this.ping_avg_sum = Date.now() - clts;
-        
+
         this.ping_avg_counter += 1;
-        
+
         if (this.ping_avg_counter >= 5) {
           this.ping_avg_counter = 0;
           this.last_ping = Math.floor(this.ping_avg_sum / 5);
@@ -100,11 +100,27 @@
           });
         });
       });
+      
+      socket.on('heartbeat-slim', players_data => {
+        for (const user_id in players_data) {
+          const player = user_id === this.my_pub_uuid ? this.player : this.other_players[user_id];
+          const pos_data = players_data[user_id];
+          
+          if (player) {
+            player.position.setX(pos_data[0]);
+            player.position.setY(pos_data[1]);
+            player.velocity.setX(pos_data[2]);
+            player.velocity.setY(pos_data[3]);
+            player.lowered_phys = pos_data[4];
+          }
+        }
+      });
 
       socket.on('heartbeat', data => {
+        console.log("Heartbeat recieved");
         this.last_heartbeat_time = Date.now();
         const sv_dt = rebound_common.get_net_ts() - data.svr_timestamp;
-        
+
         rebound_common.disable_collision_indices = data.disable_collision_indices;
 
         if (this.latest_heartbeat_packet > data.svr_timestamp) {
@@ -119,7 +135,7 @@
         }
         const sv_ticks = sv_dt / ((1 / 60) * 1000);
 
-        this.my_pub_uuid = data.my_pub_uuid        
+        this.my_pub_uuid = data.my_pub_uuid
 
         if (data.power_up_crystal_data instanceof Array) {
           this.power_up_crystal_data = data.power_up_crystal_data;
@@ -128,7 +144,8 @@
         let number_of_yous = 0;
 
         data.player_data.forEach(player_data => {
-          let player;
+          let player = null,
+            update_position = typeof data.glob_add !== typeof {} || typeof data.glob_add.onlyupdatepos !== typeof [] || data.glob_add.onlyupdatepos.indexOf(player_data.pub_uuid) !== -1;
 
           if (player_data.pub_uuid === data.my_pub_uuid) {
             player = this.player;
@@ -137,6 +154,10 @@
               console.warn("Refusing to update own player, heartbeat doesn't acknowledge action. HB ACK ID =", player_data.action_ack_id, " CLI ACK ID =", this.player_action_ack_id);
               this.action_unk_count += 1;
               return;
+            }
+            
+            if (this.player_action_ack_id !== null) {
+              update_position = false;
             }
 
             this.player_action_ack_id = null;
@@ -150,11 +171,13 @@
           }
 
           if (player !== undefined && player !== null) {
-            player.position.setX(player_data.pX);
-            player.position.setY(player_data.pY);
+            if (update_position) {
+              player.position.setX(player_data.pX);
+              player.position.setY(player_data.pY);
 
-            player.velocity.setX(player_data.vX);
-            player.velocity.setY(player_data.vY);
+              player.velocity.setX(player_data.vX);
+              player.velocity.setY(player_data.vY);
+            }
 
             player.health = player_data.health;
             player.energy = player_data.energy;
@@ -351,7 +374,7 @@
       }
     }
 
-    render(ctx, w, h) {
+    render(ctx, w, h, update_ticks) {
       ctx.clearRect(0, 0, w, h);
 
       function rdiff() {
@@ -1006,11 +1029,12 @@
               selected_weapon: this.selected_weapon_index,
               action_ack_id: this.player_action_ack_id
             });
+            this.player.weapons[this.selected_weapon_index].ammo--;
             this.player.weapons[this.selected_weapon_index].cli_internal.back_anim = (
               (
                 15 +
-                (this.player.weapons[this.selected_weapon_index].conf.additional_callibur * 7) +
-                (this.player.weapons[this.selected_weapon_index].conf.additional_callibur * 5) +
+                (this.player.weapons[this.selected_weapon_index].conf.additional_callibur * 12) +
+                (this.player.weapons[this.selected_weapon_index].conf.additional_barrels * 5) +
                 (this.player.weapons[this.selected_weapon_index].conf.additional_launching_power * 3)
               ) * rebound_common.get_firerate_multiplier(this.player.weapons[this.selected_weapon_index].conf.fire_rate) +
               (
@@ -1018,14 +1042,14 @@
                 (this.player.weapons[this.selected_weapon_index].conf.teleportation * 10)
               )
             )
-            
+
             rebound_common.apply_gun_forces(this.player, this.get_gun_dir_vec(), this.player.weapons[this.selected_weapon_index], this);
           }
         }
       }
 
       this.player.weapons.forEach(weapon => {
-        if (weapon.cli_internal.back_anim > 0) weapon.cli_internal.back_anim--;
+        if (weapon.cli_internal.back_anim > 0) weapon.cli_internal.back_anim -= 1;
         weapon.cli_internal.back_anim = Math.max(weapon.cli_internal.back_anim, 0);
       });
 

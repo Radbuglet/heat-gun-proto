@@ -559,6 +559,7 @@
       this.ctx.webkitImageSmoothingEnabled = false;
       this.ctx.msImageSmoothingEnabled = false;
       this.ctx.imageSmoothingEnabled = false;
+      this.fps_cap = 1000;
 
       this.resizecanvas();
       window.addEventListener("resize", this.resizecanvas.bind(this));
@@ -662,6 +663,10 @@
     tick() {
       window.requestAnimationFrame(this.tick.bind(this));
       const dt = Date.now() - this.last_tick;
+      
+      if (dt < (1 / this.fps_cap) * 1000) {
+        return;
+      }
 
       const ticks_passed = dt / ((1 / 60) * 1000);
       this.frames++;
@@ -677,7 +682,7 @@
       this.pointer_mode = "default";
 
       this.update(dt, ticks_passed);
-      this.render(this.ctx, this.getWidth(), this.getHeight());
+      this.render(this.ctx, this.getWidth(), this.getHeight(), ticks_passed);
 
       if (this.pointer_mode !== this.canvas.style.cursor) {
         this.canvas.style.cursor = this.pointer_mode;

@@ -455,12 +455,12 @@
       maxval: 7,
       cost: 2
     },
-    {
+    /*{
       key: "lingering_trails",
       name: "Bullet Distractions",
       maxval: 5,
       cost: 6
-    },
+    },*/
     {
       key: "trail_color",
       name: "Trail Color",
@@ -578,12 +578,12 @@
       duration: 15,
       rand_repeat: 1
     },
-    flashy_bullets: {
+    /*flashy_bullets: {
       name: "Extra Flash",
       bg_color: "#fff",
       duration: 7,
       rand_repeat: 2
-    }
+    }*/
   }
 
   // @TODO CLEARLY CLIENT PLZ MOVE BEFORE WORLD EXPLODES
@@ -617,7 +617,7 @@
   }
   
   exports.get_teleportation_punish = function(level) {
-    return level * 2;
+    return level * 0.5;
   }
 
   exports.apply_gun_forces = function(player, gun_dir_vec, weapon, optional_client) {
@@ -638,7 +638,7 @@
   }
   
   exports.get_firerate_multiplier = function(level) {
-    return 1 - (0.15 * level);
+    return 1 - (0.1 * level);
   }
 
   exports.world = {};
