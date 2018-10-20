@@ -18,7 +18,7 @@
       if (tile.layer !== "bg" && rebound_common.testrectcollision(render_position.getX(), render_position.getY(), rebound_common.conf.player_size, rebound_common.conf.player_size, tile.x, tile.y, tile.w, tile.h)) {
         is_inside_any_object = true;
       }
-    })
+    });
 
     if (is_inside_any_object) {
       ctx.globalCompositeOperation = "darken";
@@ -191,7 +191,7 @@
     });
   }
 
-  exports.draw_world = function(ctx, w, h, cam, custom_block_code, cs_world, draw_3d) {
+  exports.draw_world = function(ctx, w, h, cam, custom_block_code, cs_world, draw_3d, player_vis_group, player_touched_dec_index) {
     const center = cam.toWorldPos(new rebound_common.Vector(w / 2, h / 2), w, h);
 
     const culled_objects = exports.get_culled(cam, w, h, cs_world || rebound_common.world);
@@ -292,7 +292,7 @@
               ctx.fill();
               ctx.stroke();
             } else {
-              if (rebound_common.disable_collision_indices[i] !== true) {
+              if (rebound_common.disable_collision_indices[i] !== true && obj.layer !== "dec") {
                 ctx.fillRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
               }
 
@@ -311,7 +311,11 @@
               }
 
               if (layer_name === "dec") {
-                ctx.fillStyle = `rgba(255, 255, 255, ${Math.sin(Date.now() / 100) * 0.05 + 0})`
+                if ((player_vis_group !== undefined && player_vis_group === obj.visgroup) || player_touched_dec_index === i) {
+                  ctx.globalAlpha = 0.8;
+                }
+                
+                ctx.fillStyle = `hsl(${Date.now() / 20}, 10%, 20%)`;
                 ctx.fillRect(obj.x - 1, obj.y - 1, obj.w + 2, obj.h + 2);
               }
             }

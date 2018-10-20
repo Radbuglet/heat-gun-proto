@@ -198,8 +198,8 @@
     return objs.length > 0 ? objs[0] : null;
   }
 
-  exports.is_on_ground = function(player_loc) {
-    return !exports.canMoveInDir(player_loc, new exports.Vector(0, 2));
+  exports.is_on_ground = function(player) {
+    return !exports.canMoveInDir(player.position, new exports.Vector(0, player.get_active_weapon().conf.gravmod > 2 ? -2 : 2));
   }
 
   exports.Ray = class {
@@ -274,17 +274,27 @@
     }
   }
 
-  exports.apply_physics = function(player, ticks, selected_item_slot, is_in_flash) {
-    let c = (player.lowered_phys ? 0.2 : 0.8) + (player.weapons[selected_item_slot].conf.additional_launching_power * 0.06);
+  exports.apply_physics = function(player, ticks, is_in_flash) {
+    let c = (player.lowered_phys ? 0.2 : 0.8) + (player.get_active_weapon().conf.additional_launching_power * 0.06);
+    
+    const dist = Math.min(
+      Math.abs(player.position.getY() - exports.conf.tpzone_top),
+      Math.abs(player.position.getY() - exports.conf.tpzone_bottom)
+    );
+    
+    if (dist < 400) {
+      c = dist * dist / 160000 + 0.2;
+    }
 
     if (player.lowered_phys) {
       c = 0;
     }
+    
     ticks = ticks * c;
     const vel_with_delta = player.velocity.mult(new exports.Vector(ticks, ticks));
 
     if (vel_with_delta.getY() < 50) {
-      player.velocity.mutadd(new exports.Vector(0, ticks * 1.25));
+      player.velocity.mutadd(new exports.Vector(0, ticks * (1.25 - player.get_active_weapon().conf.gravmod * 0.5)));
     } else {
       vel_with_delta.setY(50);
     }
@@ -314,6 +324,16 @@
       } else {
         player.velocity.setY(0);
       }
+    }
+    
+    if (player.position.getY() > exports.conf.tpzone_bottom && player.velocity.getY() > 0) {
+      player.position.setY(exports.conf.tpzone_top);
+      player.velocity.setY(20);
+    }
+    
+    if (player.position.getY() < exports.conf.tpzone_top && player.velocity.getY() < 0) {
+      player.position.setY(exports.conf.tpzone_bottom);
+      player.velocity.setY(-20);
     }
 
     //player.position.setX(exports.round(player.position.getX(), 2));
@@ -347,14 +367,14 @@
             additional_callibur: 0,
             additional_size: 0,
             additional_launching_power: 0,
-            additional_efficiency: 0,
             suck_mode: 0,
             bullet_gravity: 0,
             scope: 0,
             lingering_trails: 0,
             trail_color: 0,
             teleportation: 0,
-            fire_rate: 0
+            fire_rate: 0,
+            gravmod: 0,
           }
         },
         {
@@ -374,7 +394,8 @@
             lingering_trails: 0,
             trail_color: 0,
             teleportation: 0,
-            fire_rate: 0
+            fire_rate: 0,
+            gravmod: 0,
           }
         },
         {
@@ -394,10 +415,15 @@
             lingering_trails: 0,
             trail_color: 0,
             teleportation: 0,
-            fire_rate: 0
+            fire_rate: 0,
+            gravmod: 0,
           }
         }
       ]
+    }
+    
+    get_active_weapon() {
+      return this.weapons[this.selected_slot];
     }
   }
 
@@ -447,7 +473,7 @@
       key: "bullet_gravity",
       name: "Bullet Gravity",
       maxval: 4,
-      cost: 3
+      cost: 2
     },
     {
       key: "scope",
@@ -466,6 +492,12 @@
       name: "Trail Color",
       maxval: 10,
       cost: 0
+    },
+    {
+      key: "gravmod",
+      name: "Gravity--",
+      maxval: 4,
+      cost: 4
     },
     {
       key: "teleportation",
@@ -621,16 +653,18 @@
   }
 
   exports.apply_gun_forces = function(player, gun_dir_vec, weapon, optional_client) {
-    const is_grounded = exports.is_on_ground(player.position);
+    const is_grounded = exports.is_on_ground(player);
     const tpvec = exports.get_teleportation_vec(gun_dir_vec, weapon.conf.teleportation);
     
     if (exports.canMoveInDir(player.position, tpvec)) {
       player.position.mutadd(tpvec);
     }
-
-    player.velocity = gun_dir_vec.mult(
-      new exports.Vector(is_grounded ? 40 : 30, is_grounded ? 40 : 30).add(new exports.Vector(weapon.conf.additional_launching_power * 1.5, weapon.conf.additional_launching_power * 1.5)).sub(new exports.Vector(weapon.conf.teleportation * 15, weapon.conf.teleportation * 15))
-    ).negate();
+  
+    if (weapon.conf.teleportation === 0) {
+      player.velocity = gun_dir_vec.mult(
+        new exports.Vector(is_grounded ? 40 : 30, is_grounded ? 40 : 30).add(new exports.Vector(weapon.conf.additional_launching_power * 1.5, weapon.conf.additional_launching_power * 1.5))
+      ).negate();
+    }
 
     if (weapon.conf.suck_mode) {
       player.velocity.mutnegate();

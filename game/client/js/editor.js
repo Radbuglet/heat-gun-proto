@@ -198,6 +198,11 @@
           obj.reflective = !obj.reflective;
         }
         
+        if (e.keyCode === 222) {
+          const obj = this.world.tiles[this.selected_object_index];
+          obj.visgroup = prompt("Enter visgroup", obj.visgroup === undefined ? "" : obj.visgroup);
+        }
+        
         if (e.keyCode === 72) {
           const obj = this.world.tiles[this.selected_object_index];
           obj.toggleable = !obj.toggleable;
@@ -398,6 +403,13 @@
             }
 
             ctx.fill();
+          }
+          
+          if (obj.visgroup !== undefined) {
+            ctx.fillStyle = "green";
+            ctx.textBaseline = "top";
+            ctx.font = "20px monospace";
+            ctx.fillText(obj.visgroup, obj.x, obj.y);
           }
         }, this.world);
 

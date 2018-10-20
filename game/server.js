@@ -73,6 +73,17 @@ class SocketUserController {
     this.pub_uuid = uuid4();
     this.client = client;
     this.last_fuel_ammo_time = 0;
+    this.position_log = null;
+    this.clear_position_log();
+  }
+
+  log_position(pos_vec) {
+    this.position_log.push(pos_vec);
+    this.position_log.shift();
+  }
+  
+  clear_position_log() {
+    this.position_log = new Array(common.conf.allow_svbackroll_frames).fill(0).map(() => new common.Vector(-1000000, -1000000));
   }
 
   play(username) { // (Username pre validated)
@@ -130,18 +141,18 @@ class SocketUserController {
 socket.on('connection', client => {
   console.log("A client has connected!");
 
+  let user = new SocketUserController(client);
+  players[client.id] = user;
+
   /*(function() {
     var oldEmit = client.emit;
     client.emit = function() {
       var args = Array.from(arguments);
       setTimeout(() => {
         oldEmit.apply(this, args);
-      }, 0);
+      }, Math.floor(Math.random() * 200) + 200);
     };
   })();*/
-
-  let user = new SocketUserController(client);
-  players[client.id] = user;
 
   client.on('play', username => {
     if (typeof username === "string" && common.is_valid_username(username) === null && !user.isPlaying()) {
@@ -197,9 +208,43 @@ socket.on('connection', client => {
 
   client.on("svping", clts => {
     if (typeof clts === typeof 1) {
-      socket.emit("svpong", clts);
+      client.emit("svpong", clts);
     }
   });
+
+  function wait_for_position_sync(exp_position, cb) {
+    let checks = 0;
+
+    let backroll_allowed = false;
+
+    user.position_log.forEach(prev_position => {
+      if (prev_position.distance(user.player.position) < 20) {
+        backroll_allowed = true;
+      }
+    });
+
+    const check_interval = setInterval(function() {
+      checks += 1;
+
+      const too_many_checks = checks >= 50;
+
+      if (!user || !user.player) {
+        clearInterval(check_interval);
+        return;
+      }
+
+      if (too_many_checks || exp_position.distance(user.player.position) < 50 || backroll_allowed) {
+        if (!too_many_checks) {
+          user.player.position.setX(exp_position.getX());
+          user.player.position.setY(exp_position.getY());
+        }
+
+        clearInterval(check_interval);
+
+        cb();
+      }
+    }, 20);
+  }
 
   client.on("gun", data => {
     if (typeof data !== typeof {}) return
@@ -213,173 +258,184 @@ socket.on('connection', client => {
         return;
       }
 
+      if (typeof data.player_x !== typeof 1 || typeof data.player_y !== typeof 1) {
+        return;
+      }
+
       if (data.selected_weapon !== user.player.selected_slot) {
         user.player.selected_slot = data.selected_weapon;
       }
 
       const ray_list = [];
-      const weapon = user.player.weapons[data.selected_weapon];
+      const weapon = user.player.get_active_weapon();
       if (weapon.ammo <= 0) return;
       const hit_users = [];
       weapon.ammo--;
 
-      common.apply_gun_forces(user.player, new common.Vector(Math.sin(dir), Math.cos(dir)), weapon);
 
-      for (let bc_itt = 0; bc_itt < (weapon.conf.additional_barrels + 1); bc_itt++) {
+      wait_for_position_sync(new common.Vector(data.player_x, data.player_y), () => {
+        user.clear_position_log();
+        common.apply_gun_forces(user.player, new common.Vector(Math.sin(dir), Math.cos(dir)), weapon);
 
-        const dir_rad_innac = (Math.random() - 0.75) * ((weapon.conf.additional_barrels + weapon.conf.additional_size * 0.025) / 5);
-        const vec = new common.Vector(Math.sin(dir + dir_rad_innac), Math.cos(dir + dir_rad_innac));
+        for (let bc_itt = 0; bc_itt < (weapon.conf.additional_barrels + 1); bc_itt++) {
 
-        if (!common.canMoveInDir(user.player.position, common.get_teleportation_vec(vec, weapon.conf.teleportation))) {
-          return;
-        }
+          const dir_rad_innac = (Math.random() - 0.75) * ((weapon.conf.additional_barrels + weapon.conf.additional_size * 0.025) / 5);
+          const vec = new common.Vector(Math.sin(dir + dir_rad_innac), Math.cos(dir + dir_rad_innac));
+
+          if (!common.canMoveInDir(user.player.position, common.get_teleportation_vec(vec, weapon.conf.teleportation))) {
+            return;
+          }
 
 
-        let ray = new common.Ray();
-        ray.starting_pos = user.player.position.clone().add(new common.Vector(common.conf.player_size / 2, common.conf.player_size / 2)).add(vec.mult(new common.Vector(3, 3)));
-        ray.max_dist = Math.max(1000 + (weapon.conf.additional_callibur * 200) - (weapon.conf.additional_barrels * 75), 100) + (weapon.conf.bullet_gravity * 200);
-        ray.direction = vec;
-        ray.size = 5 + weapon.conf.additional_size * 3;
+          let ray = new common.Ray();
+          ray.starting_pos = user.player.position.clone().add(new common.Vector(common.conf.player_size / 2, common.conf.player_size / 2)).add(vec.mult(new common.Vector(3, 3)));
+          ray.max_dist = Math.max(1000 + (weapon.conf.additional_callibur * 200) - (weapon.conf.additional_barrels * 75), 100) + (weapon.conf.bullet_gravity * 200);
+          ray.direction = vec;
+          ray.size = 5 + weapon.conf.additional_size * 3;
 
-        ray.gravity = Math.max((weapon.conf.bullet_gravity * 0.5 - (weapon.conf.additional_callibur * 0.1)), 0);
+          ray.gravity = Math.max((weapon.conf.bullet_gravity * 0.5 - (weapon.conf.additional_callibur * 0.1)), 0);
 
-        ray.extra_check = function() {
-          let return_val = true;
-          for (let sock_uuid in players) {
-            let ouser = players[sock_uuid];
-            if (ouser !== null && ouser.isPlaying() && ouser.pub_uuid !== user.pub_uuid) {
-              if (common.testrectcollision(
-                  ray.pos.getX() - ray.get_size_vec().getX() / 2, ray.pos.getY() - ray.get_size_vec().getY() / 2, ray.get_size_vec().getX(), ray.get_size_vec().getY(),
-                  ouser.player.position.getX(), ouser.player.position.getY(),
-                  common.conf.player_size, common.conf.player_size
-                )) {
-                let damage = Math.max(4 + (weapon.conf.additional_callibur * 1.5) + (weapon.conf.additional_barrels * 7), 3) / (weapon.conf.additional_barrels + 1) * common.get_firerate_multiplier(weapon.conf.fire_rate);
-                if (ouser.player.health - damage <= 0) {
-                  broadcast_message([{
+          ray.extra_check = function() {
+            let return_val = true;
+            for (let sock_uuid in players) {
+              let ouser = players[sock_uuid];
+              if (ouser !== null && ouser.isPlaying() && ouser.pub_uuid !== user.pub_uuid) {
+                if (common.testrectcollision(
+                    ray.pos.getX() - ray.get_size_vec().getX() / 2, ray.pos.getY() - ray.get_size_vec().getY() / 2, ray.get_size_vec().getX(), ray.get_size_vec().getY(),
+                    ouser.player.position.getX(), ouser.player.position.getY(),
+                    common.conf.player_size, common.conf.player_size
+                  )) {
+                  let damage = Math.max(4 + (weapon.conf.additional_callibur * 1.5) + (weapon.conf.additional_barrels * 7), 3) / (weapon.conf.additional_barrels + 1) * common.get_firerate_multiplier(weapon.conf.fire_rate);
+                  if (ouser.player.health - damage <= 0) {
+                    broadcast_message([{
+                        color: "darkred",
+                        text: ouser.player.name
+                      },
+                      {
+                        color: "#ee1a1a",
+                        text: " was killed by " + user.player.name
+                      }
+                    ]);
+                  }
+
+                  let gained_energy = damage / 4;
+
+                  ouser.sendMessage([{
+                      color: "red",
+                      text: user.player.name
+                    }, {
                       color: "darkred",
-                      text: ouser.player.name
-                    },
-                    {
-                      color: "#ee1a1a",
-                      text: " was killed by " + user.player.name
-                    }
-                  ]);
-                }
-
-                let gained_energy = damage / 4;
-
-                ouser.sendMessage([{
-                    color: "red",
-                    text: user.player.name
-                  }, {
-                    color: "darkred",
-                    text: " did "
-                  },
-                  {
-                    color: "red",
-                    text: Math.floor(damage * 10) / 10
-                  },
-                  {
-                    color: "darkred",
-                    text: " damage to you!"
-                  }
-                ]);
-
-                user.player.energy += gained_energy;
-                user.player.total_energy += gained_energy;
-                user.sendMessage([{
-                    color: "darkgreen",
-                    text: "You gained "
-                  },
-                  {
-                    color: "green",
-                    text: Math.floor(gained_energy * 10) / 10
-                  },
-                  {
-                    color: "darkgreen",
-                    text: " energy!"
-                  },
-                  {
-                    color: "red",
-                    text: " Damage dealt: " + Math.floor(damage * 10) / 10
-                  }
-                ]);
-
-                ouser.player.velocity = new common.Vector(0, weapon.conf.lingering_trails > 0 ? -2 : -20).add(ray.direction.mult(new common.Vector(weapon.conf.lingering_trails > 0 ? 5 : 25, weapon.conf.lingering_trails > 0 ? 5 : 25))
-                  .mult(new common.Vector(common.get_firerate_multiplier(weapon.conf.fire_rate), common.get_firerate_multiplier(weapon.conf.fire_rate))));
-                hit_users.push(ouser.pub_uuid);
-                ouser.damage_player(damage, [
-                  [{
-                      color: "darkgray",
-                      text: "You were killed by "
+                      text: " did "
                     },
                     {
                       color: "red",
-                      text: user.player.name
+                      text: Math.floor(damage * 10) / 10
+                    },
+                    {
+                      color: "darkred",
+                      text: " damage to you!"
                     }
-                  ]
-                ]);
-                return_val = false;
+                  ]);
+
+                  user.player.energy += gained_energy;
+                  user.player.total_energy += gained_energy;
+                  user.sendMessage([{
+                      color: "darkgreen",
+                      text: "You gained "
+                    },
+                    {
+                      color: "green",
+                      text: Math.floor(gained_energy * 10) / 10
+                    },
+                    {
+                      color: "darkgreen",
+                      text: " energy!"
+                    },
+                    {
+                      color: "red",
+                      text: " Damage dealt: " + Math.floor(damage * 10) / 10
+                    }
+                  ]);
+                  
+                  // @TEMP Remove knockback
+                  //ouser.player.velocity = new common.Vector(0, weapon.conf.lingering_trails > 0 ? -2 : -20).add(ray.direction.mult(new common.Vector(weapon.conf.lingering_trails > 0 ? 5 : 25, weapon.conf.lingering_trails > 0 ? 5 : 25))
+                  //  .mult(new common.Vector(common.get_firerate_multiplier(weapon.conf.fire_rate), common.get_firerate_multiplier(weapon.conf.fire_rate))));
+                  //hit_users.push(ouser.player.pub_uuid);
+                  ouser.damage_player(damage, [
+                    [{
+                        color: "darkgray",
+                        text: "You were killed by "
+                      },
+                      {
+                        color: "red",
+                        text: user.player.name
+                      }
+                    ]
+                  ]);
+                  return_val = false;
+                }
               }
             }
+
+            common.world.power_up_boxes.forEach((box_pos, i) => {
+              const box_data = power_up_crystal_data[i];
+
+              if (box_data.health > 0) {
+                if (ray.pos.distance(new common.Vector(box_pos.x, box_pos.y)) < 100) {
+                  box_data.health--;
+                  return_val = false;
+                }
+              }
+            })
+            return return_val;
           }
+          ray.world_collidable = user.player.current_power_up !== "faze_bullet";
 
-          common.world.power_up_boxes.forEach((box_pos, i) => {
-            const box_data = power_up_crystal_data[i];
+          ray.trace();
 
-            if (box_data.health > 0) {
-              if (ray.pos.distance(new common.Vector(box_pos.x, box_pos.y)) < 100) {
-                box_data.health--;
-                return_val = false;
+          if (ray.last_collided_object !== null && ray.last_collided_object.toggleable && user.player.lowered_phys) {
+            // @TODO test player collisions
+            let can_do_it = true;
+            for (let sock_uuid in players) {
+              let ouser = players[sock_uuid];
+              if (ouser !== null && ouser.isPlaying()) {
+                if (common.testrectcollision(ouser.player.position.getX(), ouser.player.position.getY(), common.conf.player_size, common.conf.player_size, ray.last_collided_object.x, ray.last_collided_object.y, ray.last_collided_object.w, ray.last_collided_object.h)) {
+                  can_do_it = false;
+                  break;
+                }
+
               }
             }
-          })
-          return return_val;
+
+            if (can_do_it) {
+              common.disable_collision_indices[ray.last_collided_object.collision_world_index] = common.disable_collision_indices[ray.last_collided_object.collision_world_index] !== true ? true : false;
+            }
+          }
+          ray_list.push(ray);
         }
-        ray.world_collidable = user.player.current_power_up !== "faze_bullet";
 
-        ray.trace();
-
-        if (ray.last_collided_object !== null && ray.last_collided_object.toggleable && user.player.lowered_phys) {
-          // @TODO test player collisions
-          let can_do_it = true;
-          for (let sock_uuid in players) {
-            let ouser = players[sock_uuid];
-            if (ouser !== null && ouser.isPlaying()) {
-              if (common.testrectcollision(ouser.player.position.getX(), ouser.player.position.getY(), common.conf.player_size, common.conf.player_size, ray.last_collided_object.x, ray.last_collided_object.y, ray.last_collided_object.w, ray.last_collided_object.h)) {
-                can_do_it = false;
-                break;
+        socket.emit("add_beams", ray_list.map((ray) => {
+          return {
+            instigator: user.pub_uuid,
+            beam_path: ray.path.map(p => {
+              return {
+                pX: p.getX(),
+                pY: p.getY()
               }
-
-            }
+            }),
+            beam_size: ray.size,
+            color: `hsl(${(weapon.conf.trail_color / 10) * 360}, 90%, 50%)`,
+            lingering_trail: weapon.conf.lingering_trails + (user.player.current_power_up === "flashy_bullets" ? 4 : 0)
           }
+        }));
 
-          if (can_do_it) {
-            common.disable_collision_indices[ray.last_collided_object.collision_world_index] = common.disable_collision_indices[ray.last_collided_object.collision_world_index] !== true ? true : false;
-          }
-        }
-        ray_list.push(ray);
-      }
-
-      socket.emit("add_beams", ray_list.map((ray) => {
-        return {
-          instigator: user.pub_uuid,
-          beam_path: ray.path.map(p => {
-            return {
-              pX: p.getX(),
-              pY: p.getY()
-            }
-          }),
-          beam_size: ray.size,
-          color: `hsl(${(weapon.conf.trail_color / 10) * 360}, 90%, 50%)`,
-          lingering_trail: weapon.conf.lingering_trails + (user.player.current_power_up === "flashy_bullets" ? 4 : 0)
-        }
-      }));
-
-      user.player.action_ack_id = data.action_ack_id;
-      // If you're wondering what will happen to the players that get damaged, they still will be damaged
-      // because my netcode is bad and damage to players will broadcast anyway.
-      broadcast_state_positions();
+        user.player.action_ack_id = data.action_ack_id;
+        // If you're wondering what will happen to the players that get damaged, they still will be damaged
+        // because my netcode is bad and damage to players will broadcast anyway.
+        broadcast_state_positions([
+          user.player.pub_uuid,
+        ].concat(hit_users), [user.player.pub_uuid]);
+      });
     }
   });
 
@@ -409,21 +465,26 @@ socket.on('connection', client => {
             user.player.velocity.setY(dir_vec.getY() * 20);
           }
 
-          if (!common.is_on_ground(user.player.position)) {
+          if (!common.is_on_ground(user.player)) {
             user.player.can_use_rush = false;
           }
 
           user.player.action_ack_id = ackid;
-          broadcast_state_positions();
+          broadcast_state_positions([
+            user.player.pub_uuid
+          ], [ user.player.pub_uuid ]);
         }
       }
     }
   });
 
-  client.on("set_lowered_phys", b => {
+  client.on("set_lowered_phys", (b, p) => {
     if (user.isPlaying() && typeof b === typeof true) {
-      user.player.lowered_phys = b;
-      broadcast_state_positions();
+      if (b === user.player.lowered_phys) return;
+      wait_for_position_sync(new common.Vector(p.x, p.y), () => {
+        user.player.lowered_phys = b;
+        broadcast_state_positions();
+      });
     }
   });
 
@@ -463,13 +524,13 @@ socket.on('connection', client => {
 
       if (data.is_increase) {
         // @TODO fix it!
-        if (player.energy >= weapon_trait_conf.cost && player.weapons[data.weapon].conf[weapon_trait_conf.key] < weapon_trait_conf.maxval) {
+        if (player.energy >= weapon_trait_conf.cost && player.get_active_weapon().conf[weapon_trait_conf.key] < weapon_trait_conf.maxval) {
           player.energy -= weapon_trait_conf.cost;
-          player.weapons[data.weapon].conf[weapon_trait_conf.key]++;
+          player.get_active_weapon().conf[weapon_trait_conf.key]++;
         }
       } else {
-        if (player.weapons[data.weapon].conf[weapon_trait_conf.key] > 0) {
-          player.weapons[data.weapon].conf[weapon_trait_conf.key]--;
+        if (player.get_active_weapon().conf[weapon_trait_conf.key] > 0) {
+          player.get_active_weapon().conf[weapon_trait_conf.key]--;
           player.energy += weapon_trait_conf.cost;
         }
       }
@@ -530,9 +591,10 @@ setInterval(_ => {
     if (user !== null && user.isPlaying()) {
       // Phys application
       common.apply_physics(user.player, ticks_passed, user.player.selected_slot);
+      user.log_position(user.player.position);
 
       // Rush controller
-      if (!user.player.can_use_rush && (common.is_on_ground(user.player.position) || user.player.current_power_up === "infinite_dashes")) {
+      if (!user.player.can_use_rush && (common.is_on_ground(user.player) || user.player.current_power_up === "infinite_dashes")) {
         user.player.can_use_rush = true;
       }
 
@@ -549,7 +611,7 @@ setInterval(_ => {
         user.player.health += 1;
       }
 
-      if (common.is_on_ground(user.player.position)) {
+      if (common.is_on_ground(user.player)) {
         let changed = false;
 
         user.player.weapons.forEach(weapon => {
@@ -579,21 +641,6 @@ setInterval(_ => {
           broadcast_state();
         }
       });
-
-      // Void damage
-      if (user.player.position.getY() > common.conf.min_kill_y) {
-        user.player.velocity.setY(-20);
-        user.player.can_use_rush = true;
-        user.player.weapons.forEach(function(weapon) {
-          weapon.ammo = weapon.conf.additional_ground_ammo + 2;
-        });
-        // @TODO
-        /*user.damage_player(1, [{
-          "color": "red",
-          "text": "You died by void damage"
-        }]);*/
-        broadcast_state();
-      }
     }
   }
 
@@ -630,26 +677,30 @@ setInterval(_ => {
 
 setInterval(_ => {
   broadcast_state(null, undefined);
-}, 500);
+}, 1000);
 
 let bsc = 0;
 
-function broadcast_state_positions() {
-  let packet = {};
-  
+function broadcast_state_positions(whitelist, no_self_update) {
+  let packet = {
+    players: {},
+    svr_timestamp: common.get_net_ts()
+  };
+
   for (let sock_uuid in players) {
     let user = players[sock_uuid];
-    if (user !== null && user.isPlaying()) {
-      packet[user.pub_uuid] = [
+    if (user !== null && user.isPlaying() && (whitelist === undefined || whitelist.indexOf(user.player.pub_uuid) !== -1)) {
+      packet.players[user.pub_uuid] = [
         user.player.position.getX(),
         user.player.position.getY(),
         user.player.velocity.getX(),
         user.player.velocity.getY(),
-        user.player.lowered_phys
+        user.player.lowered_phys,
+        (no_self_update !== undefined && no_self_update.indexOf(user.player.pub_uuid) !== -1)
       ];
     }
   }
-  
+
   for (let sock_uuid in players) {
     let user = players[sock_uuid];
     if (user !== null && user.isPlaying()) {
@@ -685,7 +736,7 @@ function broadcast_state(single_user_only, user_added_data, global_added_data) {
         energy: user.player.energy,
         total_energy: user.player.total_energy,
         lowered_phys: user.player.lowered_phys,
-        death_reason: user.player.death_reason,
+        //death_reason: user.player.death_reason,
         power_up_slot: user.player.power_up_slot,
         current_power_up: user.player.current_power_up,
         power_up_time_left: user.player.power_up_time_left,

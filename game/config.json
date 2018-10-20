@@ -1,8 +1,10 @@
 {
   "conf": {
+    "allow_svbackroll_frames": 90,
     "game_page_title": "Heat Gun",
-    "min_kill_y": 1000,
-    "player_max_health": 20,
+    "tpzone_bottom": 1700,
+    "tpzone_top": -4000,
+    "player_max_health": 25,
     "player_size": 40,
     "title_screen_title": "Heat Gun",
     "title_screen_instructions": [
@@ -67,7 +69,7 @@
       ],
       [{
           "color": "gold",
-          "text": "shift"
+          "text": "space"
         },
         {
           "color": "red",
@@ -80,7 +82,7 @@
       ],
       [{
           "color": "gold",
-          "text": "num 1"
+          "text": "    1"
         },
         {
           "color": "red",
@@ -93,7 +95,7 @@
       ],
       [{
           "color": "gold",
-          "text": "num 2"
+          "text": "    2"
         },
         {
           "color": "red",
